@@ -1,0 +1,3341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoadCraft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #0a0e18; font-family: 'Barlow Condensed', sans-serif; }
+canvas { display: block; }
+body.mode-build canvas { cursor: crosshair; }
+body.mode-edit canvas { cursor: default; }
+
+:root {
+  --bg: rgba(8,12,22,0.95);
+  --border: rgba(80,130,255,0.15);
+  --accent: #3a78ff;
+  --accent2: #00d4ff;
+  --text: #a8b8d0;
+  --text-dim: #4a6080;
+  --panel-radius: 10px;
+  --danger: #ff3366;
+  --green: #00ff88;
+}
+
+.panel {
+  position: fixed;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius);
+  backdrop-filter: blur(16px);
+  color: var(--text);
+  font-size: 12px;
+  z-index: 10;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(58,120,255,0.05) inset;
+}
+
+#toolbar {
+  top: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 4px;
+  padding: 7px 10px; white-space: nowrap;
+}
+.app-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700; color: var(--accent2);
+  letter-spacing: 2px; text-transform: uppercase;
+  padding-right: 10px; border-right: 1px solid var(--border); margin-right: 4px;
+}
+.mode-btn {
+  padding: 5px 12px; border: 1px solid var(--border);
+  border-radius: 6px; cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+  transition: all 0.15s; background: transparent; color: var(--text-dim);
+}
+.mode-btn:hover { color: var(--text); border-color: rgba(80,130,255,0.35); background: rgba(58,120,255,0.06); }
+.mode-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.mode-btn.on { background: rgba(0,255,136,0.12); color: var(--green); border-color: rgba(0,255,136,0.3); }
+.mode-btn.danger { color: var(--danger); border-color: rgba(255,51,102,0.3); }
+.mode-btn.danger:hover { background: rgba(255,51,102,0.1); }
+.tb-sep { width: 1px; height: 20px; background: var(--border); margin: 0 3px; }
+
+#left-panel {
+  top: 60px; left: 14px; width: 200px;
+  padding: 14px 12px; display: flex; flex-direction: column; gap: 0;
+  max-height: calc(100vh - 80px); overflow-y: auto;
+}
+#right-panel { top: 60px; right: 14px; width: 200px; padding: 14px 12px; display: none; }
+
+.section-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: 2px;
+  color: var(--accent2); text-transform: uppercase;
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.field { margin-bottom: 9px; }
+.field label {
+  display: flex; justify-content: space-between; align-items: center;
+  color: var(--text-dim); font-size: 10px; margin-bottom: 4px;
+  font-family: 'JetBrains Mono', monospace; font-weight: 500; letter-spacing: 0.3px;
+}
+.field label .val { color: var(--accent2); }
+
+input[type=range] { width: 100%; height: 2px; cursor: pointer; accent-color: var(--accent); border-radius: 2px; }
+input[type=color] { width: 100%; height: 26px; border: 1px solid var(--border); border-radius: 5px; cursor: pointer; background: #0a0e18; padding: 1px 3px; }
+.sep { height: 1px; background: var(--border); margin: 10px 0; }
+
+.btn {
+  display: block; width: 100%; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+  text-align: center; transition: all 0.15s; background: transparent;
+  color: var(--text); margin-bottom: 5px;
+}
+.btn:hover { background: rgba(58,120,255,0.08); border-color: rgba(80,130,255,0.4); }
+.btn.destructive { color: var(--danger); border-color: rgba(255,51,102,0.3); }
+.btn.destructive:hover { background: rgba(255,51,102,0.1); }
+
+.type-row { display: flex; gap: 5px; }
+.type-btn {
+  flex: 1; padding: 5px 4px; border: 1px solid var(--border); border-radius: 5px;
+  background: transparent; color: var(--text-dim); cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 600;
+  transition: all 0.15s; text-align: center;
+}
+.type-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.type-btn:not(.active):hover { border-color: rgba(80,130,255,0.4); color: var(--text); }
+
+#status {
+  position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+  background: var(--bg); color: var(--text-dim);
+  padding: 6px 16px; border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3px;
+  z-index: 10; border: 1px solid var(--border); white-space: nowrap;
+}
+
+#build-counter {
+  position: fixed; top: 62px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,212,255,0.1); color: var(--accent2);
+  border: 1px solid rgba(0,212,255,0.25);
+  padding: 4px 14px; border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; z-index: 10; display: none;
+}
+
+#build-finish-btn {
+  position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,255,136,0.15); color: var(--green);
+  border: 1px solid rgba(0,255,136,0.4);
+  padding: 8px 28px; border-radius: 24px; cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  z-index: 10; display: none; transition: all 0.15s;
+}
+#build-finish-btn:hover { background: rgba(0,255,136,0.28); }
+
+#axis-lock {
+  position: fixed; bottom: 42px; left: 220px;
+  padding: 3px 12px; border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; z-index: 10; display: none;
+  font-weight: 700; letter-spacing: 0.5px;
+}
+#axis-lock.x { background: rgba(255,80,80,0.15); color: #ff6060; border: 1px solid rgba(255,80,80,0.35); }
+#axis-lock.z { background: rgba(80,180,255,0.15); color: #60c0ff; border: 1px solid rgba(80,180,255,0.35); }
+
+#snap-indicator {
+  position: fixed; bottom: 42px; right: 220px;
+  background: rgba(0,255,136,0.1); color: var(--green);
+  border: 1px solid rgba(0,255,136,0.25);
+  padding: 3px 10px; border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; z-index: 10; display: none;
+}
+
+.cam-row { display: flex; gap: 5px; margin-bottom: 10px; }
+.cam-btn {
+  flex: 1; padding: 5px 0; border: 1px solid var(--border); border-radius: 5px;
+  background: transparent; color: var(--text-dim); cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  transition: all 0.15s; text-align: center; letter-spacing: 0.5px;
+}
+.cam-btn:hover { border-color: rgba(80,130,255,0.4); color: var(--text); background: rgba(58,120,255,0.06); }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="panel" id="toolbar">
+  <span class="app-title">RoadCraft</span>
+  <button class="mode-btn" id="btn-view" onclick="setMode('view')">VIEW</button>
+  <button class="mode-btn active" id="btn-build" onclick="setMode('build')">BUILD</button>
+  <button class="mode-btn" id="btn-edit" onclick="setMode('edit')">EDIT</button>
+  <div class="tb-sep"></div>
+  <button class="mode-btn" id="btn-pts" onclick="togglePointVis()" title="Toggle points (P)">POINTS</button>
+  <div class="tb-sep"></div>
+  <button class="mode-btn" onclick="exportOBJ()">EXPORT</button>
+  <div class="tb-sep"></div>
+  <button class="mode-btn" onclick="openSaveLoad()">LAYOUTS</button>
+  <div class="tb-sep"></div>
+  <div class="tb-sep"></div>
+  <button class="mode-btn" onclick="openTruckPanel()">🚛 TRUCKS</button>
+  <div class="tb-sep"></div>
+  <button class="mode-btn" onclick="addTextObject()">𝐓 TEXT</button>
+  <div class="tb-sep"></div>
+  <button class="mode-btn danger" onclick="clearAll()">CLEAR</button>
+</div>
+
+<div class="panel" id="left-panel">
+  <div class="section-title">Camera</div>
+  <div class="cam-row">
+    <button class="cam-btn" onclick="camPerspective()">PERSP</button>
+    <button class="cam-btn" onclick="camTopDown()">TOP</button>
+    <button class="cam-btn" onclick="camFront()">FRONT</button>
+  </div>
+  <div class="section-title">Road Defaults</div>
+  <div class="field">
+    <label>Color</label>
+    <input type="color" id="g-color" value="#7ec850" oninput="applyGlobal()">
+  </div>
+  <div class="field">
+    <label>Width <span class="val" id="gw-v">2m</span></label>
+    <input type="range" id="g-width" min="1" max="24" step="0.5" value="2" oninput="applyGlobal()">
+  </div>
+  <div class="field">
+    <label>Thickness <span class="val" id="gt-v">0.35m</span></label>
+    <input type="range" id="g-thick" min="0.05" max="1.5" step="0.05" value="0.35" oninput="applyGlobal()">
+  </div>
+  <div class="field">
+    <label>Opacity <span class="val" id="go-v">100%</span></label>
+    <input type="range" id="g-opacity" min="0.05" max="1" step="0.05" value="1" oninput="applyGlobal()">
+  </div>
+  <div class="field">
+    <label>Direction Arrow</label>
+    <div class="type-row" style="margin-top:4px">
+      <button class="type-btn active" id="gd-forward"  onclick="setGlobalDir('forward')">▶ Fwd</button>
+      <button class="type-btn"        id="gd-backward" onclick="setGlobalDir('backward')">◀ Bck</button>
+      <button class="type-btn"        id="gd-none"     onclick="setGlobalDir('none')">None</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div id="poly-defaults-section" style="display:none">
+    <div class="section-title">Polygon Defaults</div>
+    <div class="field"><label>Fill Color</label><input type="color" id="gp-fill" value="#c87020" oninput="applyPolyGlobal()"></div>
+    <div class="field"><label>Outline Color</label><input type="color" id="gp-outline" value="#5c2e00" oninput="applyPolyGlobal()"></div>
+    <div class="field">
+      <label>Outline Width <span class="val" id="gpow-v">0.4m</span></label>
+      <input type="range" id="gp-owidth" min="0" max="2" step="0.05" value="0.1" oninput="applyPolyGlobal()">
+    </div>
+    <div class="field">
+      <label>Opacity <span class="val" id="gpo-v">80%</span></label>
+      <input type="range" id="gp-opacity" min="0.05" max="1" step="0.05" value="0.8" oninput="applyPolyGlobal()">
+    </div>
+    <div class="field">
+      <label>Filled</label>
+      <div class="type-row" style="margin-top:4px">
+        <button class="type-btn active" id="gpf-yes" onclick="setPolyGlobalFilled(true)">Filled</button>
+        <button class="type-btn" id="gpf-no" onclick="setPolyGlobalFilled(false)">Outline Only</button>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="section-title" style="font-size:8px">Place Preset Shape</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:9px">
+      <button class="type-btn" onclick="placePresetShape('circle')" style="font-size:10px;padding:5px 0">● Circle</button>
+      <button class="type-btn" onclick="placePresetShape('square')" style="font-size:10px;padding:5px 0">■ Square</button>
+      <button class="type-btn" onclick="placePresetShape('rectangle')" style="font-size:10px;padding:5px 0">▬ Rect</button>
+      <button class="type-btn" onclick="placePresetShape('hexagon')" style="font-size:10px;padding:5px 0">⬡ Hex</button>
+      <button class="type-btn" onclick="placePresetShape('octagon')" style="font-size:10px;padding:5px 0;grid-column:span 2">⯃ Octagon</button>
+    </div>
+    <div class="sep"></div>
+  </div>
+  <div id="ribbon-defaults-section" style="display:none">
+    <div class="section-title">Line Defaults</div>
+    <div class="field"><label>Color</label><input type="color" id="gr-color" value="#c87020" oninput="applyRibbonGlobal()"></div>
+    <div class="field">
+      <label>Width <span class="val" id="grw-v">4m</span></label>
+      <input type="range" id="gr-width" min="0.5" max="20" step="0.5" value="3" oninput="applyRibbonGlobal()">
+    </div>
+    <div class="field">
+      <label>Opacity <span class="val" id="gro-v">90%</span></label>
+      <input type="range" id="gr-opacity" min="0.05" max="1" step="0.05" value="0.9" oninput="applyRibbonGlobal()">
+    </div>
+    <div class="field">
+      <label>Ends</label>
+      <div class="type-row" style="margin-top:4px">
+        <button class="type-btn active" id="grc-round" onclick="setRibbonGlobalCap('rounded')">Rounded</button>
+        <button class="type-btn" id="grc-flat" onclick="setRibbonGlobalCap('straight')">Straight</button>
+      </div>
+    </div>
+    <div class="sep"></div>
+  </div>
+  <div class="section-title">Scene</div>
+  <div class="field"><label>Junction Points</label><button class="type-btn" id="btn-pts-panel" onclick="togglePointVis()" style="width:100%;margin-top:4px">Toggle (P)</button></div>
+  <div class="field">
+    <label>Sky &amp; Ground</label>
+    <select id="sky-select" onchange="applySkyPreset(parseInt(this.value))" style="width:100%;padding:5px 6px;background:rgba(10,14,28,0.9);color:#a8b8d0;border:1px solid rgba(80,130,255,0.15);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;margin-top:4px;"></select>
+  </div>
+  <div class="field"><label>Grid</label><input type="color" id="grid-col" value="#3d3008" oninput="applyScene()"></div>
+  <div class="sep"></div>
+  <div class="section-title">Snap</div>
+  <div class="field">
+    <label>Grid Snap <span class="val" id="sg-v">ON</span></label>
+    <input type="range" id="g-snap" min="0" max="1" step="1" value="1" oninput="applySnap()">
+  </div>
+  <div class="field">
+    <label>Grid Size <span class="val" id="gs-v">1m</span></label>
+    <input type="range" id="g-snapsize" min="0.5" max="5" step="0.5" value="1" oninput="applySnap()">
+  </div>
+  <div class="field">
+    <label>Pt Snap <span class="val" id="ps-v">1.5m</span></label>
+    <input type="range" id="g-ptsnap" min="0.5" max="4" step="0.5" value="1.5" oninput="applySnap()">
+  </div>
+</div>
+
+<div class="panel" id="right-panel">
+  <div class="section-title">Segment</div>
+  <div id="no-sel" style="color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:10px;margin-bottom:8px">Click a road to select</div>
+  <div id="seg-props" style="display:none">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent2);margin-bottom:10px" id="seg-label">SEG #—</div>
+    <div class="field">
+      <label>Type</label>
+      <div class="type-row">
+        <button class="type-btn active" id="rt-straight" onclick="setSegType('straight')">Straight</button>
+        <button class="type-btn" id="rt-curved" onclick="setSegType('curved')">Curved</button>
+      </div>
+    </div>
+    <div id="curve-actions" style="display:none;margin-bottom:9px">
+      <button class="btn" onclick="flipCurve()" style="color:var(--accent2);border-color:rgba(0,212,255,0.3)">⟳ Flip Curve Direction</button>
+    </div>
+    <div class="field"><label>Color</label><input type="color" id="s-color" value="#7ec850" oninput="applySegment()"></div>
+    <div class="field">
+      <label>Width <span class="val" id="sw-v">4m</span></label>
+      <input type="range" id="s-width" min="1" max="24" step="0.5" value="4" oninput="applySegment()">
+    </div>
+    <div class="field">
+      <label>Thickness <span class="val" id="st-v">0.2m</span></label>
+      <input type="range" id="s-thick" min="0.05" max="1.5" step="0.05" value="0.2" oninput="applySegment()">
+    </div>
+    <div class="field">
+      <label>Opacity <span class="val" id="so-v">100%</span></label>
+      <input type="range" id="s-opacity" min="0.05" max="1" step="0.05" value="1" oninput="applySegment()">
+    </div>
+    <div class="field">
+      <label>Direction Arrow</label>
+      <div class="type-row" style="margin-top:4px">
+        <button class="type-btn" id="sd-forward"  onclick="setSegDir('forward')">▶ Fwd</button>
+        <button class="type-btn" id="sd-backward" onclick="setSegDir('backward')">◀ Bck</button>
+        <button class="type-btn" id="sd-none"     onclick="setSegDir('none')">None</button>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <button class="btn destructive" onclick="deleteSelected()">Delete Segment</button>
+    <button class="btn" onclick="copySelected();deselect()">Copy (Ctrl+C)</button>
+    <button class="btn" onclick="deselect()">Deselect</button>
+  </div>
+  <div id="ribbon-props" style="display:none">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent2);margin-bottom:10px" id="ribbon-label">LINE #—</div>
+    <div class="field"><label>Color</label><input type="color" id="sr-color" value="#c87020" oninput="applyRibbonSegment()"></div>
+    <div class="field">
+      <label>Width <span class="val" id="srw-v">4m</span></label>
+      <input type="range" id="sr-width" min="0.5" max="20" step="0.5" value="3" oninput="applyRibbonSegment()">
+    </div>
+    <div class="field">
+      <label>Rotation <span class="val" id="srr-v">0°</span></label>
+      <input type="range" id="sr-rot" min="0" max="360" step="1" value="0" oninput="applyRibbonSegment()">
+    </div>
+    <div class="field">
+      <label>Opacity <span class="val" id="sro-v">90%</span></label>
+      <input type="range" id="sr-opacity" min="0.05" max="1" step="0.05" value="0.9" oninput="applyRibbonSegment()">
+    </div>
+    <div class="field">
+      <label>Ends</label>
+      <div class="type-row" style="margin-top:4px">
+        <button class="type-btn active" id="src-round" onclick="setRibbonCap('rounded')">Rounded</button>
+        <button class="type-btn" id="src-flat" onclick="setRibbonCap('straight')">Straight</button>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <button class="btn destructive" onclick="deleteSelectedRibbon()">Delete Line</button>
+    <button class="btn" onclick="copySelected()">Copy (Ctrl+C)</button>
+    <button class="btn" onclick="deselectRibbon()">Deselect</button>
+  </div>
+  <div id="poly-props" style="display:none">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent2);margin-bottom:10px" id="poly-label">POLY #—</div>
+    <div class="field"><label>Fill Color</label><input type="color" id="sp-fill" value="#c87020" oninput="applyPolySegment()"></div>
+    <div class="field"><label>Outline Color</label><input type="color" id="sp-outline" value="#5c2e00" oninput="applyPolySegment()"></div>
+    <div class="field">
+      <label>Outline Width <span class="val" id="spow-v">0.4m</span></label>
+      <input type="range" id="sp-owidth" min="0" max="2" step="0.05" value="0.1" oninput="applyPolySegment()">
+    </div>
+    <div class="field">
+      <label>Rotation <span class="val" id="spr-v">0°</span></label>
+      <input type="range" id="sp-rot" min="0" max="360" step="1" value="0" oninput="applyPolySegment()">
+    </div>
+    <div class="field">
+      <label>Opacity <span class="val" id="spo-v">80%</span></label>
+      <input type="range" id="sp-opacity" min="0.05" max="1" step="0.05" value="0.8" oninput="applyPolySegment()">
+    </div>
+    <div class="field">
+      <label>Filled</label>
+      <div class="type-row" style="margin-top:4px">
+        <button class="type-btn" id="spf-yes" onclick="setPolyFilled(true)">Filled</button>
+        <button class="type-btn" id="spf-no" onclick="setPolyFilled(false)">Outline Only</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Size <span class="val" id="sps-v">100%</span></label>
+      <input type="range" id="sp-size" min="10" max="400" step="5" value="100" oninput="applyPolySize()">
+    </div>
+    <div class="sep"></div>
+    <button class="btn destructive" onclick="deleteSelectedPoly()">Delete Polygon</button>
+    <button class="btn" onclick="copySelected();deselectPoly()">Copy (Ctrl+C)</button>
+    <button class="btn" onclick="deselectPoly()">Deselect</button>
+  </div>
+  <div id="text-props" style="display:none">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent2);margin-bottom:10px" id="text-label">TEXT #—</div>
+    <div class="field">
+      <label>Text</label>
+      <input type="text" id="st-text" value="Label" maxlength="80" style="width:100%;padding:5px 7px;background:rgba(10,14,28,0.9);color:#a8b8d0;border:1px solid rgba(80,130,255,0.15);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:10px;outline:none;box-sizing:border-box;" oninput="applyTextObject()">
+    </div>
+    <div class="field"><label>Color</label><input type="color" id="st-color" value="#ffffff" oninput="applyTextObject()"></div>
+    <div class="field">
+      <label>Size <span class="val" id="stsize-v">2m</span></label>
+      <input type="range" id="st-size" min="0.3" max="20" step="0.1" value="2" oninput="applyTextObject()">
+    </div>
+    <div class="field">
+      <label>Bold</label>
+      <div class="type-row" style="margin-top:4px">
+        <button class="type-btn active" id="stb-on" onclick="setTextBold(true)">Bold</button>
+        <button class="type-btn" id="stb-off" onclick="setTextBold(false)">Normal</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Facing</label>
+      <div class="type-row" style="margin-top:4px">
+        <button class="type-btn active" id="stf-cam" onclick="setTextFacing('camera')">Camera</button>
+        <button class="type-btn" id="stf-flat" onclick="setTextFacing('flat')">Flat</button>
+        <button class="type-btn" id="stf-rot" onclick="setTextFacing('rotation')">Angle</button>
+      </div>
+    </div>
+    <div class="field" id="st-rot-field" style="display:none">
+      <label>Rotation <span class="val" id="str-v">0°</span></label>
+      <input type="range" id="st-rot" min="0" max="360" step="5" value="0" oninput="applyTextObject()">
+    </div>
+    <div class="field">
+      <label>X <span class="val" id="stx-v">0m</span></label>
+      <input type="range" id="st-x" min="-60" max="60" step="0.5" value="0" oninput="applyTextObject()">
+    </div>
+    <div class="field">
+      <label>Z <span class="val" id="stz-v">0m</span></label>
+      <input type="range" id="st-z" min="-60" max="60" step="0.5" value="0" oninput="applyTextObject()">
+    </div>
+    <div class="sep"></div>
+    <button class="btn destructive" onclick="deleteSelectedText()">Delete Text</button>
+    <button class="btn" onclick="deselectText()">Deselect</button>
+  </div>
+</div>
+
+
+<div id="truck-panel" style="display:none;position:fixed;top:60px;right:228px;width:200px;background:rgba(8,12,22,0.95);border:1px solid rgba(80,130,255,0.15);border-radius:10px;padding:14px 12px;z-index:20;backdrop-filter:blur(16px);box-shadow:0 4px 32px rgba(0,0,0,0.5);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <span style="font-family:JetBrains Mono,monospace;font-size:9px;font-weight:700;letter-spacing:2px;color:#00d4ff;text-transform:uppercase">Trucks</span>
+    <button onclick="document.getElementById('truck-panel').style.display='none'" style="background:none;border:none;color:#4a6080;font-size:16px;cursor:pointer;line-height:1">&#x2715;</button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div onclick="spawnTruck()" style="cursor:pointer;background:rgba(58,120,255,0.08);border:1px solid rgba(58,120,255,0.2);border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;transition:all 0.15s;" onmouseover="this.style.background='rgba(58,120,255,0.18)'" onmouseout="this.style.background='rgba(58,120,255,0.08)'">
+      <span style="font-size:24px">🚛</span>
+      <div>
+        <div style="font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:700;color:#a8b8d0;">CAT 797F</div>
+        <div style="font-family:JetBrains Mono,monospace;font-size:9px;color:#4a6080;">Mining Dump Truck</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:10px;font-family:JetBrains Mono,monospace;font-size:9px;color:#4a6080;line-height:1.5">
+    Click to spawn · Select in<br>Edit mode to move/resize
+  </div>
+</div>
+
+<div id="truck-props-panel" style="display:none;position:fixed;top:60px;right:228px;width:200px;background:rgba(8,12,22,0.95);border:1px solid rgba(80,130,255,0.15);border-radius:10px;padding:14px 12px;z-index:20;backdrop-filter:blur(16px);box-shadow:0 4px 32px rgba(0,0,0,0.5);">
+  <div style="font-family:JetBrains Mono,monospace;font-size:9px;font-weight:700;letter-spacing:2px;color:#00d4ff;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(80,130,255,0.15)">CAT 797F</div>
+  <div class="field">
+    <label>X Position <span class="val" id="tr-x-v">0m</span></label>
+    <input type="range" id="tr-x" min="-40" max="40" step="0.5" value="0" oninput="applyTruckTransform()">
+  </div>
+  <div class="field">
+    <label>Z Position <span class="val" id="tr-z-v">0m</span></label>
+    <input type="range" id="tr-z" min="-40" max="40" step="0.5" value="0" oninput="applyTruckTransform()">
+  </div>
+  <div class="field">
+    <label>Rotation <span class="val" id="tr-r-v">0°</span></label>
+    <input type="range" id="tr-rot" min="0" max="360" step="5" value="0" oninput="applyTruckTransform()">
+  </div>
+  <div class="field">
+    <label>Scale <span class="val" id="tr-s-v">1.0×</span></label>
+    <input type="range" id="tr-scale" min="0.03" max="0.8" step="0.01" value="0.18" oninput="applyTruckTransform()">
+  </div>
+  <div class="sep"></div>
+  <button class="btn destructive" onclick="deleteSelectedTruck()">Delete Truck</button>
+  <button class="btn" onclick="deselectTruck()">Deselect</button>
+</div>
+
+<div id="status">VIEW — left-drag: pan · right-drag: orbit · scroll: zoom</div>
+<div id="build-subtype" style="position:fixed;top:55px;left:50%;transform:translateX(-50%);display:none;z-index:15;gap:0;background:rgba(8,12,22,0.95);border:1px solid rgba(80,130,255,0.15);border-radius:6px;overflow:hidden;margin-top:54px;display:none;flex-direction:row;"><button id="bst-road" onclick="setBuildSubType('road')" style="padding:5px 14px;border:none;border-right:1px solid rgba(80,130,255,0.15);background:var(--accent);color:#fff;font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">⊢ ROAD</button><button id="bst-poly" onclick="setBuildSubType('polygon')" style="padding:5px 14px;border:none;border-right:1px solid rgba(80,130,255,0.15);background:transparent;color:var(--text-dim);font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">◈ POLYGON</button><button id="bst-ribbon" onclick="setBuildSubType('ribbon')" style="padding:5px 14px;border:none;background:transparent;color:var(--text-dim);font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">⌇ LINE</button></div>
+<div id="build-counter">0 POINTS</div>
+<button id="build-finish-btn" onclick="finishBuild()">✓ Finish Road</button>
+<div id="axis-lock"></div>
+<div id="snap-indicator">⊕ SNAP</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── SCENE ─────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0e1830');
+scene.fog = new THREE.Fog(0x0e1830, 80, 200);
+
+const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 2000);
+let camTheta = 0.6, camPhi = 1.0, camRadius = 60;
+let camTarget = new THREE.Vector3(0, 0, 0);
+let isTopDown = true;
+
+function updateCamera() {
+  if (isTopDown) {
+    camera.position.set(camTarget.x, camRadius, camTarget.z);
+    camera.up.set(0, 0, -1);
+    camera.lookAt(camTarget);
+  } else {
+    camera.up.set(0, 1, 0);
+    const sp = Math.sin(camPhi), cp = Math.cos(camPhi);
+    const st = Math.sin(camTheta), ct = Math.cos(camTheta);
+    camera.position.set(camTarget.x + camRadius*sp*st, camTarget.y + camRadius*cp, camTarget.z + camRadius*sp*ct);
+    camera.lookAt(camTarget);
+  }
+}
+updateCamera();
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+sun.position.set(30, 60, 20); sun.castShadow = true; sun.shadow.mapSize.set(2048,2048);
+const sc = sun.shadow.camera; sc.near=0.5; sc.far=300; sc.left=sc.bottom=-80; sc.right=sc.top=80;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x4080ff, 0.2);
+fill.position.set(-20,15,-15); scene.add(fill);
+
+const gndMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(600,600),
+  new THREE.MeshLambertMaterial({ color: 0x0c1220 })
+);
+gndMesh.rotation.x = -Math.PI/2; gndMesh.receiveShadow = true;
+scene.add(gndMesh);
+
+// Smaller grid: 80x80 units
+let gridHelper = new THREE.GridHelper(120, 120, 0x3d3008, 0x3d3008);
+gridHelper.position.y = 0.01; scene.add(gridHelper);
+
+const pickPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(2000,2000),
+  new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+);
+pickPlane.rotation.x = -Math.PI/2; scene.add(pickPlane);
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const G = { color: '#7ec850', width: 2, thickness: 0.35, opacity: 1.0, direction: 'forward' };
+const GP = { fillColor: '#c87020', outlineColor: '#5c2e00', outlineWidth: 0.1, opacity: 0.8, filled: true };
+
+let polygons = [];
+let selectedPoly = null;
+let buildSubType = 'road'; // 'road' | 'polygon'
+const SN = { grid: true, gridSize: 1, pointSnap: 1.5 };
+
+let segments = [], netPts = [], buildPts = [];
+let appMode = 'view';
+let selectedSeg = null, hoveredSeg = null;
+let isDraggingDot = false, dragInfo = null;
+let pointsVisible = false;
+let axisLock = null; // null | 'x' | 'z'
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// ── MATERIAL FACTORY ──────────────────────────────────────────────────────────
+// polygonOffset prevents z-fighting between overlapping road meshes
+function makeMat(color, offsetFactor, opacity) {
+  const f = offsetFactor !== undefined ? offsetFactor : -1;
+  const op = opacity !== undefined ? opacity : 1.0;
+  const mat = new THREE.MeshLambertMaterial({
+    color: new THREE.Color(color),
+    transparent: op < 1.0,
+    opacity: op,
+    side: THREE.DoubleSide,
+  });
+  mat.polygonOffset = true;
+  mat.polygonOffsetFactor = f;
+  mat.polygonOffsetUnits = f;
+  return mat;
+}
+
+// ── ROAD SEGMENT ──────────────────────────────────────────────────────────────
+let segCounter = 0;
+class RoadSeg {
+  constructor(start, end) {
+    this.id = ++segCounter;
+    this.start = start; this.end = end;
+    this.width = G.width; this.color = G.color; this.thickness = G.thickness; this.opacity = G.opacity; this.direction = G.direction;
+    this.type = 'straight';
+    this.arrowMesh = null;
+    this.ctrlPt = null;
+    this.curveSide = 1;
+    this.mesh = null;
+  }
+
+  _defaultCtrl() {
+    const mid = new THREE.Vector3().addVectors(this.start, this.end).multiplyScalar(0.5);
+    const dir = new THREE.Vector3().subVectors(this.end, this.start);
+    const perp = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+    return mid.clone().addScaledVector(perp, dir.length() * 0.3 * this.curveSide);
+  }
+
+  getCtrlPt() {
+    if (!this.ctrlPt) this.ctrlPt = this._defaultCtrl();
+    return this.ctrlPt;
+  }
+
+  flipCurve() {
+    this.curveSide *= -1;
+    if (this.ctrlPt) {
+      // Mirror control point through midpoint of start-end
+      const mid = new THREE.Vector3().addVectors(this.start, this.end).multiplyScalar(0.5);
+      this.ctrlPt = new THREE.Vector3(2*mid.x - this.ctrlPt.x, 0, 2*mid.z - this.ctrlPt.z);
+    }
+    this.rebuild(); rebuildAllJunctions();
+  }
+
+  rebuild() {
+    if (this.mesh) { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); this.mesh = null; }
+    const mat = makeMat(this.color, -1, this.opacity);
+    let geo;
+    if (this.type === 'straight') {
+      const dir = new THREE.Vector3().subVectors(this.end, this.start);
+      if (dir.length() < 0.05) return;
+      geo = makeBoxRoad(this.start, this.end, this.width, this.thickness);
+    } else {
+      const cp = this.getCtrlPt();
+      const curve = new THREE.QuadraticBezierCurve3(
+        new THREE.Vector3(this.start.x, 0, this.start.z),
+        new THREE.Vector3(cp.x, 0, cp.z),
+        new THREE.Vector3(this.end.x, 0, this.end.z)
+      );
+      geo = makeRibbonGeo(curve, this.width, this.thickness);
+    }
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.castShadow = true; this.mesh.receiveShadow = true;
+    this.mesh.userData.segId = this.id; this.mesh.userData.isRoad = true;
+    this.mesh.renderOrder = 2;
+    scene.add(this.mesh);
+    // Arrow indicator
+    if (this.arrowMesh) { scene.remove(this.arrowMesh); this.arrowMesh.geometry.dispose(); this.arrowMesh.material.dispose(); this.arrowMesh = null; }
+    if (this.direction !== 'none') {
+      const arrowGeo = makeArrowGeo(this);
+      const arrowCol = lightenHex(this.color, 0.82);
+      const arrowMat = makeMat(arrowCol, -3, this.opacity);
+      this.arrowMesh = new THREE.Mesh(arrowGeo, arrowMat);
+      this.arrowMesh.userData.isArrow = true;
+      this.arrowMesh.renderOrder = 4;
+      scene.add(this.arrowMesh);
+    }
+  }
+
+  setEmissive(hex) { if (this.mesh) this.mesh.material.emissive.set(hex); }
+  destroy() {
+    if (this.mesh) { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); this.mesh = null; }
+    if (this.arrowMesh) { scene.remove(this.arrowMesh); this.arrowMesh.geometry.dispose(); this.arrowMesh.material.dispose(); this.arrowMesh = null; }
+  }
+}
+
+// ── POLYGON SHAPE ────────────────────────────────────────────────────────────
+let polyCounter = 0;
+class PolygonShape {
+  constructor(pts) {
+    this.id = ++polyCounter;
+    this.pts = pts.map(p => p.clone()); // array of Vector3 (y=0)
+    this.fillColor   = GP.fillColor;
+    this.outlineColor= GP.outlineColor;
+    this.outlineWidth= GP.outlineWidth;
+    this.opacity     = GP.opacity;
+    this.filled      = GP.filled;
+    this.rotation    = 0;
+    this.scale       = 1.0;  // for size slider
+    this.centerPt    = null; // centroid
+    this.fillMesh    = null;
+    this.outlineMeshes = [];
+  }
+
+  rebuild() {
+    this.destroy();
+    const n = this.pts.length;
+    if (n < 3) return;
+
+    // Rotate pts around centroid
+    const cx = this.pts.reduce((s,p)=>s+p.x,0)/n;
+    const cz = this.pts.reduce((s,p)=>s+p.z,0)/n;
+    const rad = this.rotation * Math.PI / 180;
+    const rpts = this.pts.map(p => {
+      const dx=p.x-cx, dz=p.z-cz;
+      return {x: cx + dx*Math.cos(rad) - dz*Math.sin(rad), z: cz + dx*Math.sin(rad) + dz*Math.cos(rad)};
+    });
+
+    // Above grid (Y=0.01), roads render on top via renderOrder=2+
+    const Y_FILL    = -0.005;
+    const Y_OUTLINE = -0.003;
+
+    // ── Fill: simple fan triangulation in XZ ──────────────────────────────
+    if (this.filled) {
+      const verts = [];
+      for (const p of rpts) verts.push(p.x, Y_FILL, p.z);
+      const indices = [];
+      for (let i = 1; i < n - 1; i++) indices.push(0, i, i+1);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      geo.computeBoundingSphere();
+      const mat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(this.fillColor),
+        transparent: true,
+        opacity: this.opacity,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+      });
+      this.fillMesh = new THREE.Mesh(geo, mat);
+      this.fillMesh.renderOrder = 1;
+      this.fillMesh.userData.polyId = this.id;
+      this.fillMesh.userData.isPoly = true;
+      scene.add(this.fillMesh);
+    }
+
+    // ── Outline: one flat quad per edge ───────────────────────────────────
+    if (this.outlineWidth > 0.01) {
+      const hw = this.outlineWidth / 2;
+      for (let i = 0; i < n; i++) {
+        const a = rpts[i], b = rpts[(i+1) % n];
+        const dx = b.x - a.x, dz = b.z - a.z;
+        const len = Math.sqrt(dx*dx + dz*dz);
+        if (len < 0.01) continue;
+        const rx = -dz/len * hw, rz = dx/len * hw;
+        const verts = [
+          a.x-rx, Y_OUTLINE, a.z-rz,
+          a.x+rx, Y_OUTLINE, a.z+rz,
+          b.x+rx, Y_OUTLINE, b.z+rz,
+          b.x-rx, Y_OUTLINE, b.z-rz,
+        ];
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        geo.setIndex([0,1,2, 0,2,3]);
+        geo.computeVertexNormals();
+        geo.computeBoundingSphere();
+        const mat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(this.outlineColor),
+          transparent: true,
+          opacity: this.opacity,
+          side: THREE.DoubleSide,
+          depthTest: false,
+          depthWrite: false,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.renderOrder = 1;
+        mesh.userData.polyId = this.id;
+        mesh.userData.isPoly = true;
+        scene.add(mesh);
+        this.outlineMeshes.push(mesh);
+      }
+    }
+  }
+
+  setEmissive(hex) {
+    // MeshBasicMaterial has no emissive — tint the color on select/deselect
+    const isOn = (hex !== 0 && hex !== 0x000000);
+    if (this.fillMesh)
+      this.fillMesh.material.color.set(new THREE.Color(isOn ? lightenHex(this.fillColor, 0.35) : this.fillColor));
+    for (const m of this.outlineMeshes)
+      m.material.color.set(new THREE.Color(isOn ? lightenHex(this.outlineColor, 0.35) : this.outlineColor));
+  }
+
+  destroy() {
+    if (this.fillMesh) { scene.remove(this.fillMesh); this.fillMesh.geometry.dispose(); this.fillMesh.material.dispose(); this.fillMesh = null; }
+    for (const m of this.outlineMeshes) { scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+    this.outlineMeshes = [];
+  }
+}
+
+// ── RIBBON SHAPE ─────────────────────────────────────────────────────────────
+const GR = { color: '#c87020', width: 3.0, opacity: 0.9, capStyle: 'rounded' };
+let ribbonCounter = 0;
+let ribbons = [];
+let selectedRibbon = null;
+
+function makeRibbonShapeGeo(pts, width, capStyle='rounded') {
+  const hw = width / 2;
+  const CAP_SEGS = 12;
+  const Y = -0.005;
+  const n = pts.length;
+  if (n < 2) return null;
+
+  const verts = [];
+  const idx = [];
+  let vi = 0;
+  const push = (x, z) => { verts.push(x, Y, z); return vi++; };
+
+  // Per-segment direction and right-normal (true perpendicular, constant width)
+  const dirs = [], rights = [];
+  for (let i = 0; i < n-1; i++) {
+    const dx = pts[i+1].x - pts[i].x, dz = pts[i+1].z - pts[i].z;
+    const len = Math.sqrt(dx*dx+dz*dz) || 1;
+    dirs.push({ x: dx/len, z: dz/len });
+    rights.push({ x: -dz/len, z: dx/len });
+  }
+
+  // Each segment has 4 verts at its own exact perpendicular — no miter distortion
+  // segPts[i] = { aL, aR, bL, bR } — vertex indices for segment i
+  const segs = [];
+  for (let i = 0; i < n-1; i++) {
+    const a = pts[i], b = pts[i+1], r = rights[i];
+    const aL = push(a.x + r.x*hw, a.z + r.z*hw);
+    const aR = push(a.x - r.x*hw, a.z - r.z*hw);
+    const bL = push(b.x + r.x*hw, b.z + r.z*hw);
+    const bR = push(b.x - r.x*hw, b.z - r.z*hw);
+    idx.push(aL, aR, bR,  aL, bR, bL);
+    segs.push({ aL, aR, bL, bR });
+  }
+
+  // Bevel joins between segments — fill the gap on the outer side with 1 triangle
+  for (let i = 0; i < n-2; i++) {
+    const p = pts[i+1];
+    const cross = dirs[i].x * dirs[i+1].z - dirs[i].z * dirs[i+1].x;
+    const cv = push(p.x, p.z);
+    if (cross > 0.001) {
+      // Right turn — gap on right side
+      idx.push(cv, segs[i].bR, segs[i+1].aR);
+    } else if (cross < -0.001) {
+      // Left turn — gap on left side
+      idx.push(cv, segs[i+1].aL, segs[i].bL);
+    }
+    // Straight (cross ≈ 0): segments are already flush, no fill needed
+  }
+
+  // Caps
+  if (capStyle === 'rounded') {
+    // Start cap: semicircle pointing backward from pts[0]
+    {
+      const p = pts[0];
+      const r = rights[0];
+      const cv = push(p.x, p.z);
+      const baseA = Math.atan2(-dirs[0].z, -dirs[0].x); // backward
+      const halfA = Math.atan2(r.z, r.x);
+      for (let s = 0; s <= CAP_SEGS; s++) {
+        const a = halfA + Math.PI + Math.PI * s / CAP_SEGS;
+        push(p.x + Math.cos(a)*hw, p.z + Math.sin(a)*hw);
+      }
+      const arcStart = vi - CAP_SEGS - 1;
+      for (let s = 0; s < CAP_SEGS; s++) {
+        idx.push(cv, arcStart+s, arcStart+s+1);
+      }
+    }
+    // End cap: semicircle pointing forward from pts[n-1]
+    {
+      const p = pts[n-1];
+      const r = rights[n-2];
+      const cv = push(p.x, p.z);
+      const halfA = Math.atan2(r.z, r.x);
+      for (let s = 0; s <= CAP_SEGS; s++) {
+        const a = halfA - Math.PI * s / CAP_SEGS;
+        push(p.x + Math.cos(a)*hw, p.z + Math.sin(a)*hw);
+      }
+      const arcStart = vi - CAP_SEGS - 1;
+      for (let s = 0; s < CAP_SEGS; s++) {
+        idx.push(cv, arcStart+s, arcStart+s+1);
+      }
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+function avgNorm(a, b) {
+  const nx = a.x + b.x, nz = a.z + b.z;
+  const len = Math.sqrt(nx*nx + nz*nz) || 1;
+  return { x: nx/len, z: nz/len };
+}
+
+class RibbonShape {
+  constructor(pts) {
+    this.id = ++ribbonCounter;
+    this.pts = pts.map(p => p.clone());
+    this.color    = GR.color;
+    this.width    = GR.width;
+    this.opacity  = GR.opacity;
+    this.rotation = 0;
+    this.capStyle = GR.capStyle;
+    this.mesh     = null;
+  }
+
+  rebuild() {
+    if (this.mesh) { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); this.mesh = null; }
+    if (this.pts.length < 2) return;
+    // Rotate pts around centroid before building geo
+    const rn = this.pts.length;
+    const rcx = this.pts.reduce((s,p)=>s+p.x,0)/rn;
+    const rcz = this.pts.reduce((s,p)=>s+p.z,0)/rn;
+    const rrad = this.rotation * Math.PI / 180;
+    const rpts = this.pts.map(p => {
+      const dx=p.x-rcx, dz=p.z-rcz;
+      return new THREE.Vector3(rcx + dx*Math.cos(rrad) - dz*Math.sin(rrad), 0, rcz + dx*Math.sin(rrad) + dz*Math.cos(rrad));
+    });
+    const geo = makeRibbonShapeGeo(rpts, this.width, this.capStyle || 'rounded');
+    if (!geo) return;
+    const mat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(this.color),
+      transparent: true,
+      opacity: this.opacity,
+      side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false,
+    });
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.renderOrder = 1;
+    this.mesh.userData.ribbonId = this.id;
+    this.mesh.userData.isRibbon = true;
+    scene.add(this.mesh);
+  }
+
+  setEmissive(hex) {
+    if (!this.mesh) return;
+    const isOn = (hex !== 0 && hex !== 0x000000);
+    this.mesh.material.color.set(new THREE.Color(isOn ? lightenHex(this.color, 0.35) : this.color));
+  }
+
+  destroy() {
+    if (this.mesh) { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); this.mesh = null; }
+  }
+}
+
+
+function setRibbonGlobalCap(v) {
+  GR.capStyle = v;
+  document.getElementById('grc-round').classList.toggle('active', v==='rounded');
+  document.getElementById('grc-flat').classList.toggle('active', v==='straight');
+}
+function setRibbonCap(v) {
+  if (!selectedRibbon) return;
+  selectedRibbon.capStyle = v;
+  document.getElementById('src-round').classList.toggle('active', v==='rounded');
+  document.getElementById('src-flat').classList.toggle('active', v==='straight');
+  selectedRibbon.rebuild();
+  selectedRibbon.setEmissive(0x2244cc);
+}
+function applyRibbonGlobal() {
+  GR.color   = document.getElementById('gr-color').value;
+  GR.width   = parseFloat(document.getElementById('gr-width').value);
+  GR.opacity = parseFloat(document.getElementById('gr-opacity').value);
+  document.getElementById('grw-v').textContent = GR.width+'m';
+  document.getElementById('gro-v').textContent = Math.round(GR.opacity*100)+'%';
+}
+
+function selectRibbon(r) {
+  if (selectedRibbon) selectedRibbon.setEmissive(0x000000);
+  deselect(); deselectPoly(); deselectTruck();
+  selectedRibbon = r;
+  r.setEmissive(0x2244cc);
+  document.getElementById('no-sel').style.display='none';
+  document.getElementById('seg-props').style.display='none';
+  document.getElementById('poly-props').style.display='none';
+  document.getElementById('ribbon-props').style.display='block';
+  document.getElementById('ribbon-label').textContent='LINE #'+r.id;
+  document.getElementById('sr-color').value  = r.color;
+  document.getElementById('sr-width').value  = r.width;
+  document.getElementById('sro-v').textContent = Math.round(r.opacity*100)+'%';
+  document.getElementById('sr-opacity').value = r.opacity;
+  document.getElementById('srw-v').textContent = r.width+'m';
+  document.getElementById('sr-rot').value = r.rotation||0;
+  document.getElementById('srr-v').textContent = (r.rotation||0)+'°';
+  const cap = r.capStyle||'rounded';
+  document.getElementById('src-round').classList.toggle('active', cap==='rounded');
+  document.getElementById('src-flat').classList.toggle('active', cap==='straight');
+}
+
+function deselectRibbon() {
+  if (selectedRibbon) selectedRibbon.setEmissive(0x000000);
+  selectedRibbon = null;
+  document.getElementById('ribbon-props').style.display='none';
+  document.getElementById('no-sel').style.display='block';
+}
+
+function applyRibbonSegment() {
+  if (!selectedRibbon) return;
+  selectedRibbon.color   = document.getElementById('sr-color').value;
+  selectedRibbon.width    = parseFloat(document.getElementById('sr-width').value);
+  selectedRibbon.opacity  = parseFloat(document.getElementById('sr-opacity').value);
+  selectedRibbon.rotation = parseFloat(document.getElementById('sr-rot').value);
+  document.getElementById('srr-v').textContent = selectedRibbon.rotation+'°';
+  document.getElementById('srw-v').textContent = selectedRibbon.width+'m';
+  document.getElementById('sro-v').textContent = Math.round(selectedRibbon.opacity*100)+'%';
+  selectedRibbon.rebuild();
+  selectedRibbon.setEmissive(0x2244cc);
+}
+
+function deleteSelectedRibbon() {
+  if (!selectedRibbon) return;
+  selectedRibbon.destroy();
+  ribbons = ribbons.filter(r => r !== selectedRibbon);
+  selectedRibbon = null;
+  document.getElementById('ribbon-props').style.display='none';
+  document.getElementById('no-sel').style.display='block';
+}
+
+// ── PRESET POLYGON SHAPES ─────────────────────────────────────────────────────
+function placePresetShape(type) {
+  // Generate pts around camera target
+  const cx = camTarget.x, cz = camTarget.z;
+  const R = 8; // default radius
+  let pts = [];
+  if (type === 'circle') {
+    const segs = 32;
+    for (let i = 0; i < segs; i++) {
+      const a = (i/segs) * Math.PI*2;
+      pts.push(new THREE.Vector3(cx + Math.cos(a)*R, 0, cz + Math.sin(a)*R));
+    }
+  } else if (type === 'square') {
+    pts = [
+      new THREE.Vector3(cx-R,0,cz-R), new THREE.Vector3(cx+R,0,cz-R),
+      new THREE.Vector3(cx+R,0,cz+R), new THREE.Vector3(cx-R,0,cz+R),
+    ];
+  } else if (type === 'rectangle') {
+    const W=R*1.8, H=R*0.9;
+    pts = [
+      new THREE.Vector3(cx-W,0,cz-H), new THREE.Vector3(cx+W,0,cz-H),
+      new THREE.Vector3(cx+W,0,cz+H), new THREE.Vector3(cx-W,0,cz+H),
+    ];
+  } else if (type === 'hexagon') {
+    for (let i = 0; i < 6; i++) {
+      const a = (i/6)*Math.PI*2 - Math.PI/6;
+      pts.push(new THREE.Vector3(cx + Math.cos(a)*R, 0, cz + Math.sin(a)*R));
+    }
+    // hexagon defaults: rotation 30°, size 90%
+    hexDefaultRot = 30; hexDefaultSize = 45;
+  } else if (type === 'octagon') {
+    for (let i = 0; i < 8; i++) {
+      const a = (i/8)*Math.PI*2 - Math.PI/8;
+      pts.push(new THREE.Vector3(cx + Math.cos(a)*R, 0, cz + Math.sin(a)*R));
+    }
+  }
+  const poly = new PolygonShape(pts);
+  if (typeof hexDefaultRot !== 'undefined') { poly.rotation = hexDefaultRot; poly.scale = hexDefaultSize/100; }
+  poly.rebuild();
+  polygons.push(poly);
+  setMode('edit');
+  deselectRibbon();
+  selectPoly(poly);
+  // Reset temp vars
+  hexDefaultRot = undefined; hexDefaultSize = undefined;
+}
+
+// ── GEOMETRY ──────────────────────────────────────────────────────────────────
+function makeBoxRoad(start, end, width, thickness) {
+  const dir = new THREE.Vector3().subVectors(end, start);
+  const len = dir.length(), hw = width/2, h = thickness, hl = len/2;
+  const angle = Math.atan2(dir.x, dir.z);
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+  // local-to-world: lx=across, lz=along
+  const toW = (lx, y, lz) => [mid.x + lx*cos + lz*sin, y, mid.z - lx*sin + lz*cos];
+  // corners: [−hw,−hl], [+hw,−hl], [+hw,+hl], [−hw,+hl]  (bottom=y0, top=y=h)
+  const pos = [], nrm = [], idx = [];
+  let vi = 0;
+  const quad = (verts, nx, ny, nz) => {
+    const base = vi;
+    for (const v of verts) { pos.push(...v); nrm.push(nx,ny,nz); vi++; }
+    idx.push(base,base+1,base+2, base,base+2,base+3);
+  };
+  // Top face (0,1,0)
+  quad([toW(-hw,h,-hl), toW(hw,h,-hl), toW(hw,h,hl), toW(-hw,h,hl)], 0,1,0);
+  // Bottom face (0,-1,0) — reversed winding
+  quad([toW(-hw,0,hl), toW(hw,0,hl), toW(hw,0,-hl), toW(-hw,0,-hl)], 0,-1,0);
+  // Front cap (+along dir) — outward normal = (sin,0,cos)
+  quad([toW(hw,h,hl), toW(-hw,h,hl), toW(-hw,0,hl), toW(hw,0,hl)], sin,0,cos);
+  // Back cap (−along dir)
+  quad([toW(-hw,h,-hl), toW(hw,h,-hl), toW(hw,0,-hl), toW(-hw,0,-hl)], -sin,0,-cos);
+  // Right side (+perp) — outward normal = (cos,0,−sin)
+  quad([toW(hw,h,-hl), toW(hw,h,hl), toW(hw,0,hl), toW(hw,0,-hl)], cos,0,-sin);
+  // Left side (−perp)
+  quad([toW(-hw,h,hl), toW(-hw,h,-hl), toW(-hw,0,-hl), toW(-hw,0,hl)], -cos,0,sin);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal',   new THREE.Float32BufferAttribute(nrm, 3));
+  geo.setIndex(idx);
+  return geo;
+}
+
+function makeRibbonGeo(curve, width, thickness) {
+  const N = 32;
+  const pts = curve.getPoints(N);
+  const half = width / 2, h = thickness;
+
+  // Pre-compute per-slice tangent and right vectors
+  const tangs = [], rights = [];
+  for (let i = 0; i <= N; i++) {
+    let t;
+    if (i === 0)       t = new THREE.Vector3().subVectors(pts[1], pts[0]).normalize();
+    else if (i === N)  t = new THREE.Vector3().subVectors(pts[N], pts[N-1]).normalize();
+    else               t = new THREE.Vector3().subVectors(pts[i+1], pts[i-1]).normalize();
+    tangs.push(t);
+    rights.push(new THREE.Vector3(t.z, 0, -t.x).normalize());
+  }
+
+  const pos = [], nrm = [], idx = [];
+  let vi = 0;
+
+  // ── TOP FACE: all normals (0,1,0), separate verts from sides ──────────────
+  // Each slice has 2 top verts: left and right at y=h
+  const topBase = vi;
+  for (let i = 0; i <= N; i++) {
+    const p = pts[i], r = rights[i];
+    pos.push(p.x - r.x*half, h, p.z - r.z*half); nrm.push(0,1,0);
+    pos.push(p.x + r.x*half, h, p.z + r.z*half); nrm.push(0,1,0);
+    vi += 2;
+  }
+  for (let i = 0; i < N; i++) {
+    const a = topBase + i*2, b = topBase + (i+1)*2;
+    idx.push(a, b, b+1,  a, b+1, a+1);
+  }
+
+  // ── BOTTOM FACE: all normals (0,-1,0) ──────────────────────────────────────
+  const botBase = vi;
+  for (let i = 0; i <= N; i++) {
+    const p = pts[i], r = rights[i];
+    pos.push(p.x - r.x*half, 0, p.z - r.z*half); nrm.push(0,-1,0);
+    pos.push(p.x + r.x*half, 0, p.z + r.z*half); nrm.push(0,-1,0);
+    vi += 2;
+  }
+  for (let i = 0; i < N; i++) {
+    const a = botBase + i*2, b = botBase + (i+1)*2;
+    idx.push(a, b+1, b,  a, a+1, b+1); // reversed winding
+  }
+
+  // ── LEFT SIDE: outward normal = -right ────────────────────────────────────
+  for (let i = 0; i < N; i++) {
+    const pA = pts[i], pB = pts[i+1];
+    const rA = rights[i], rB = rights[i+1];
+    // Average outward normal for this quad
+    const nx = -(rA.x + rB.x) * 0.5, nz = -(rA.z + rB.z) * 0.5;
+    const nl = Math.sqrt(nx*nx + nz*nz) || 1;
+    const v0=vi; pos.push(pA.x-rA.x*half, h, pA.z-rA.z*half); nrm.push(nx/nl,0,nz/nl); vi++;
+    const v1=vi; pos.push(pA.x-rA.x*half, 0, pA.z-rA.z*half); nrm.push(nx/nl,0,nz/nl); vi++;
+    const v2=vi; pos.push(pB.x-rB.x*half, 0, pB.z-rB.z*half); nrm.push(nx/nl,0,nz/nl); vi++;
+    const v3=vi; pos.push(pB.x-rB.x*half, h, pB.z-rB.z*half); nrm.push(nx/nl,0,nz/nl); vi++;
+    idx.push(v0,v1,v2, v0,v2,v3);
+  }
+
+  // ── RIGHT SIDE: outward normal = +right ───────────────────────────────────
+  for (let i = 0; i < N; i++) {
+    const pA = pts[i], pB = pts[i+1];
+    const rA = rights[i], rB = rights[i+1];
+    const nx = (rA.x + rB.x) * 0.5, nz = (rA.z + rB.z) * 0.5;
+    const nl = Math.sqrt(nx*nx + nz*nz) || 1;
+    const v0=vi; pos.push(pA.x+rA.x*half, h, pA.z+rA.z*half); nrm.push(nx/nl,0,nz/nl); vi++;
+    const v1=vi; pos.push(pB.x+rB.x*half, h, pB.z+rB.z*half); nrm.push(nx/nl,0,nz/nl); vi++;
+    const v2=vi; pos.push(pB.x+rB.x*half, 0, pB.z+rB.z*half); nrm.push(nx/nl,0,nz/nl); vi++;
+    const v3=vi; pos.push(pA.x+rA.x*half, 0, pA.z+rA.z*half); nrm.push(nx/nl,0,nz/nl); vi++;
+    idx.push(v0,v1,v2, v0,v2,v3);
+  }
+
+  // ── START CAP ─────────────────────────────────────────────────────────────
+  {
+    const t = tangs[0], r = rights[0], p = pts[0];
+    const nx = -t.x, nz = -t.z;
+    const v0=vi; pos.push(p.x-r.x*half, h, p.z-r.z*half); nrm.push(nx,0,nz); vi++;
+    const v1=vi; pos.push(p.x+r.x*half, h, p.z+r.z*half); nrm.push(nx,0,nz); vi++;
+    const v2=vi; pos.push(p.x+r.x*half, 0, p.z+r.z*half); nrm.push(nx,0,nz); vi++;
+    const v3=vi; pos.push(p.x-r.x*half, 0, p.z-r.z*half); nrm.push(nx,0,nz); vi++;
+    idx.push(v0,v1,v2, v0,v2,v3);
+  }
+
+  // ── END CAP ───────────────────────────────────────────────────────────────
+  {
+    const t = tangs[N], r = rights[N], p = pts[N];
+    const nx = t.x, nz = t.z;
+    const v0=vi; pos.push(p.x+r.x*half, h, p.z+r.z*half); nrm.push(nx,0,nz); vi++;
+    const v1=vi; pos.push(p.x-r.x*half, h, p.z-r.z*half); nrm.push(nx,0,nz); vi++;
+    const v2=vi; pos.push(p.x-r.x*half, 0, p.z-r.z*half); nrm.push(nx,0,nz); vi++;
+    const v3=vi; pos.push(p.x+r.x*half, 0, p.z+r.z*half); nrm.push(nx,0,nz); vi++;
+    idx.push(v0,v1,v2, v0,v2,v3);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal',   new THREE.Float32BufferAttribute(nrm, 3));
+  geo.setIndex(idx);
+  return geo;
+}
+
+// ── ARROW INDICATORS ─────────────────────────────────────────────────────────
+function lightenHex(hex, amount) {
+  // Blend hex color toward white by `amount` (0-1)
+  const c = new THREE.Color(hex);
+  c.r = Math.min(1, c.r + (1 - c.r) * amount);
+  c.g = Math.min(1, c.g + (1 - c.g) * amount);
+  c.b = Math.min(1, c.b + (1 - c.b) * amount);
+  return '#' + c.getHexString();
+}
+
+function makeArrowGeo(seg) {
+  // Arrow is a flat isosceles triangle sitting on top of the road.
+  // For 'forward': tip points toward end, placed at ~20% along road from start.
+  // For 'backward': tip points toward start, placed at ~20% along road from end.
+  const th = seg.thickness + 0.03; // just above road surface
+  const W = seg.width * 0.28;      // arrow width
+  const L = W * 1.2;               // arrow length (tip to base)
+  const slabH = 0.04;              // vertical thickness of arrow slab
+
+  // Fixed world-space offset from start (forward) or end (backward)
+  const OFFSET = seg.width * 0.15 + 0.1; // tight gap from the endpoint
+
+  let pos, fwd;
+  if (seg.type === 'straight') {
+    const dir = new THREE.Vector3().subVectors(seg.end, seg.start);
+    const len = dir.length();
+    fwd = dir.clone().normalize();
+    // Place arrow at fixed distance from start or end
+    if (seg.direction === 'forward') {
+      pos = seg.start.clone().addScaledVector(fwd, OFFSET + L * 0.5);
+    } else {
+      pos = seg.end.clone().addScaledVector(fwd, -(OFFSET + L * 0.5));
+      fwd.negate();
+    }
+  } else {
+    const cp = seg.getCtrlPt();
+    const curve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(seg.start.x, 0, seg.start.z),
+      new THREE.Vector3(cp.x, 0, cp.z),
+      new THREE.Vector3(seg.end.x, 0, seg.end.z)
+    );
+    // Estimate arc length to convert fixed offset to a t value
+    const totalLen = curve.getLength();
+    const tOffset = Math.min((OFFSET + L * 0.5) / Math.max(totalLen, 0.01), 0.45);
+    const t = seg.direction === 'forward' ? tOffset : 1 - tOffset;
+    const pt3 = curve.getPoint(t);
+    pos = new THREE.Vector3(pt3.x, 0, pt3.z);
+    const tang = curve.getTangent(t);
+    fwd = new THREE.Vector3(tang.x, 0, tang.z).normalize();
+    if (seg.direction === 'backward') fwd.negate();
+  }
+
+  // Local frame: fwd = along, right = perp
+  const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+
+  // 3 triangle corners in world-XZ, at y = th (top) and y = th - slabH (bottom)
+  // Tip: forward from center by L*0.6
+  // Base-left and base-right: back by L*0.4, offset ±W/2
+  const tip  = pos.clone().addScaledVector(fwd, L * 0.6);
+  const bL   = pos.clone().addScaledVector(fwd, -L * 0.4).addScaledVector(right,  W * 0.5);
+  const bR   = pos.clone().addScaledVector(fwd, -L * 0.4).addScaledVector(right, -W * 0.5);
+
+  const yT = th, yB = th - slabH;
+  const verts = [
+    tip.x, yT, tip.z,   bL.x, yT, bL.z,   bR.x, yT, bR.z,   // top face
+    tip.x, yB, tip.z,   bL.x, yB, bL.z,   bR.x, yB, bR.z,   // bottom face
+  ];
+  // explicit normals
+  const norms = [
+    0,1,0, 0,1,0, 0,1,0,       // top
+    0,-1,0, 0,-1,0, 0,-1,0,    // bottom
+  ];
+  // top CCW, bottom CW (to keep outward normals)
+  const indices = [
+    0,1,2,         // top face
+    3,5,4,         // bottom face
+    // sides: tip-bL, bL-bR, bR-tip
+    0,3,4, 0,4,1,  // tip-bL side
+    1,4,5, 1,5,2,  // bL-bR side (base)
+    2,5,3, 2,3,0,  // bR-tip side
+  ];
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setAttribute('normal',   new THREE.Float32BufferAttribute(norms, 3));
+  geo.setIndex(indices);
+  return geo;
+}
+
+// ── JUNCTIONS ─────────────────────────────────────────────────────────────────
+let junctionMeshes = new Map();
+
+function segTangentAt(seg, pt) {
+  if (seg.type === 'straight') {
+    return seg.start===pt
+      ? new THREE.Vector3().subVectors(seg.end, seg.start).normalize()
+      : new THREE.Vector3().subVectors(seg.start, seg.end).normalize();
+  } else {
+    const cp = seg.getCtrlPt();
+    return seg.start===pt
+      ? new THREE.Vector3().subVectors(cp, seg.start).normalize()
+      : new THREE.Vector3().subVectors(cp, seg.end).normalize();
+  }
+}
+
+function convexHull2D(pts) {
+  if (pts.length < 3) return pts;
+  const sorted = pts.slice().sort((a,b) => a.x!==b.x ? a.x-b.x : a.z-b.z);
+  const cross = (O,A,B) => (A.x-O.x)*(B.z-O.z)-(A.z-O.z)*(B.x-O.x);
+  const lower=[], upper=[];
+  for (const p of sorted) {
+    while (lower.length>=2 && cross(lower[lower.length-2],lower[lower.length-1],p)<=0) lower.pop();
+    lower.push(p);
+  }
+  for (let i=sorted.length-1; i>=0; i--) {
+    const p=sorted[i];
+    while (upper.length>=2 && cross(upper[upper.length-2],upper[upper.length-1],p)<=0) upper.pop();
+    upper.push(p);
+  }
+  upper.pop(); lower.pop();
+  return lower.concat(upper);
+}
+
+function rebuildJunction(pt) {
+  if (junctionMeshes.has(pt)) {
+    const old = junctionMeshes.get(pt);
+    scene.remove(old); old.geometry.dispose(); old.material.dispose();
+    junctionMeshes.delete(pt);
+  }
+  const segs = segments.filter(s => s.start===pt || s.end===pt);
+  if (segs.length < 2) return;
+
+  const edgePts=[];
+  let maxThick=0;
+  for (const seg of segs) {
+    const tang = segTangentAt(seg, pt);
+    const perp = new THREE.Vector3(-tang.z, 0, tang.x);
+    const hw = seg.width/2;
+    edgePts.push({x:pt.x+perp.x*hw, z:pt.z+perp.z*hw});
+    edgePts.push({x:pt.x-perp.x*hw, z:pt.z-perp.z*hw});
+    maxThick = Math.max(maxThick, seg.thickness);
+  }
+  edgePts.push({x:pt.x, z:pt.z});
+  const hull = convexHull2D(edgePts);
+  if (hull.length < 3) return;
+
+  const h=maxThick, n=hull.length;
+  // Build geometry with UNSHARED vertices per face group so normals are exact.
+  // Top face shares no vertices with side faces → top always has normal (0,1,0).
+  const pos=[], nrm=[], idx=[];
+  let vi=0;
+
+  // ── TOP FACE (fan from center) ──────────────────────────────
+  // All top verts have normal (0,1,0)
+  const topCtr = vi; pos.push(pt.x,h,pt.z); nrm.push(0,1,0); vi++;
+  const topRing = vi;
+  for (const v of hull) { pos.push(v.x,h,v.z); nrm.push(0,1,0); vi++; }
+  for (let i=0;i<n;i++) { idx.push(topCtr, topRing+i, topRing+(i+1)%n); }
+
+  // ── BOTTOM FACE (fan, reversed winding for outward normal) ──
+  const botCtr = vi; pos.push(pt.x,0,pt.z); nrm.push(0,-1,0); vi++;
+  const botRing = vi;
+  for (const v of hull) { pos.push(v.x,0,v.z); nrm.push(0,-1,0); vi++; }
+  for (let i=0;i<n;i++) { idx.push(botCtr, botRing+(i+1)%n, botRing+i); }
+
+  // ── SIDE QUADS (one quad per hull edge, own verts + outward normal) ─────────
+  for (let i=0;i<n;i++) {
+    const a=hull[i], b=hull[(i+1)%n];
+    // Outward edge normal (XZ plane, perpendicular to edge, pointing away from center)
+    const ex=b.x-a.x, ez=b.z-a.z, len=Math.sqrt(ex*ex+ez*ez)||1;
+    const nx=ez/len, nz=-ex/len; // rotate 90° CW = outward
+    // 4 verts for this quad: a-top, b-top, b-bot, a-bot
+    const v0=vi; pos.push(a.x,h,a.z); nrm.push(nx,0,nz); vi++;
+    const v1=vi; pos.push(b.x,h,b.z); nrm.push(nx,0,nz); vi++;
+    const v2=vi; pos.push(b.x,0,b.z); nrm.push(nx,0,nz); vi++;
+    const v3=vi; pos.push(a.x,0,a.z); nrm.push(nx,0,nz); vi++;
+    idx.push(v0,v1,v2, v0,v2,v3);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('normal',   new THREE.Float32BufferAttribute(nrm,3));
+  geo.setIndex(idx);
+
+  const colorCounts={};
+  for (const seg of segs) colorCounts[seg.color]=(colorCounts[seg.color]||0)+1;
+  const bestColor = Object.entries(colorCounts).sort((a,b)=>b[1]-a[1])[0][0];
+
+  const mat = makeMat(bestColor, -2); // junctions sit on top of roads
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow=true; mesh.receiveShadow=true;
+  mesh.userData.isJunction=true; mesh.renderOrder=3;
+  scene.add(mesh);
+  junctionMeshes.set(pt, mesh);
+}
+
+function rebuildAllJunctions() { for (const pt of netPts) rebuildJunction(pt); }
+
+// ── POINT DOTS ────────────────────────────────────────────────────────────────
+let dotObjects = [];
+let globalDotMeshes = [];
+
+function clearDots(types) {
+  dotObjects = dotObjects.filter(d => {
+    if (!types || types.includes(d.type)) { scene.remove(d.mesh); if(d.mesh.geometry)d.mesh.geometry.dispose(); return false; }
+    return true;
+  });
+}
+
+function makeDotMesh(pos, col, size) {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(size, 10, 10),
+    new THREE.MeshLambertMaterial({ color: col, emissive: new THREE.Color(col).multiplyScalar(0.3) })
+  );
+  m.position.set(pos.x, size+0.1, pos.z);
+  scene.add(m); return m;
+}
+
+function buildDotMeshes() {
+  clearDots(['build']);
+  for (const p of buildPts) {
+    const mesh = makeDotMesh(p, 0x3a78ff, 0.36);
+    dotObjects.push({ mesh, type:'build', ptRef:p });
+  }
+}
+
+function buildEditDotMeshes() {
+  clearDots(['edit','ctrl','polyvert','ribbonpt']);
+  if (appMode !== 'edit') return;
+  // Road endpoint dots
+  const seen = new Set();
+  for (const seg of segments) {
+    for (const pt of [seg.start, seg.end]) {
+      if (!seen.has(pt)) {
+        seen.add(pt);
+        const mesh = makeDotMesh(pt, 0xff7040, 0.42);
+        mesh.userData.isEditDot = true;
+        const segs = segments.filter(s => s.start===pt||s.end===pt);
+        dotObjects.push({ mesh, type:'edit', ptRef:pt, segs });
+      }
+    }
+    if (seg.type==='curved' && seg===selectedSeg) {
+      const cp = seg.getCtrlPt();
+      const mesh = makeDotMesh(cp, 0xffcc00, 0.32);
+      mesh.userData.isCtrlDot = true;
+      dotObjects.push({ mesh, type:'ctrl', ptRef:cp, seg, isCtrl:true });
+    }
+  }
+  // Polygon vertex dots (only for selected polygon)
+  if (selectedPoly) {
+    selectedPoly.pts.forEach((pt, vi) => {
+      const mesh = makeDotMesh(pt, 0x00ffcc, 0.35);
+      mesh.userData.isPolyVert = true;
+      dotObjects.push({ mesh, type:'polyvert', ptRef:pt, poly:selectedPoly, vi });
+    });
+  }
+  // Ribbon endpoint dots (only for selected ribbon)
+  if (selectedRibbon) {
+    selectedRibbon.pts.forEach((pt, vi) => {
+      const mesh = makeDotMesh(pt, 0xff9900, 0.35);
+      mesh.userData.isRibbonPt = true;
+      dotObjects.push({ mesh, type:'ribbonpt', ptRef:pt, ribbon:selectedRibbon, vi });
+    });
+  }
+}
+
+function rebuildGlobalDots() {
+  for (const m of globalDotMeshes) { scene.remove(m); if(m.geometry)m.geometry.dispose(); }
+  globalDotMeshes = [];
+  if (!pointsVisible) return;
+  for (const pt of netPts) {
+    const m = makeDotMesh(pt, 0x00d4ff, 0.25);
+    globalDotMeshes.push(m);
+  }
+}
+
+function togglePointVis() {
+  pointsVisible = !pointsVisible;
+  document.getElementById('btn-pts').classList.toggle('on', pointsVisible);
+  rebuildGlobalDots();
+}
+
+// ── POINT MANAGEMENT ─────────────────────────────────────────────────────────
+function snapToGrid(v) {
+  if (!SN.grid) return new THREE.Vector3(v.x, 0, v.z);
+  const s = SN.gridSize;
+  return new THREE.Vector3(Math.round(v.x/s)*s, 0, Math.round(v.z/s)*s);
+}
+
+function applyAxisLock(pos) {
+  if (!axisLock || buildPts.length === 0) return pos;
+  const last = buildPts[buildPts.length-1];
+  if (axisLock==='x') return new THREE.Vector3(pos.x, 0, last.z);
+  if (axisLock==='z') return new THREE.Vector3(last.x, 0, pos.z);
+  return pos;
+}
+
+function findNearPt(v, exclude) {
+  let best=null, bestD=SN.pointSnap;
+  for (const p of netPts) {
+    if (p===exclude) continue;
+    const d = Math.sqrt((p.x-v.x)**2+(p.z-v.z)**2);
+    if (d<bestD) { best=p; bestD=d; }
+  }
+  return best;
+}
+
+function getOrMakePt(v) {
+  const near = findNearPt(v);
+  if (near) return near;
+  const p = new THREE.Vector3(v.x, 0, v.z);
+  netPts.push(p); return p;
+}
+
+function getWorldAt(e) {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(pickPlane);
+  if (!hits.length) return null;
+  return snapToGrid(hits[0].point);
+}
+
+// ── PREVIEW ───────────────────────────────────────────────────────────────────
+let previewLine=null, previewDot=null;
+
+function updatePreview(curPos) {
+  if (previewLine) { scene.remove(previewLine); previewLine=null; }
+  if (!buildPts.length||!curPos) return;
+  const pts = [...buildPts, curPos];
+  const geo = new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(p.x,0.3,p.z)));
+  const previewColor = buildSubType==='polygon' ? new THREE.Color(GP.outlineColor) : buildSubType==='ribbon' ? new THREE.Color(GR.color) : new THREE.Color(0x3a78ff);
+  previewLine = new THREE.Line(geo, new THREE.LineBasicMaterial({color:previewColor,transparent:true,opacity:0.55}));
+  scene.add(previewLine);
+}
+
+function clearPreview() {
+  if (previewLine) { scene.remove(previewLine); previewLine=null; }
+  if (previewDot) { scene.remove(previewDot); if(previewDot.geometry)previewDot.geometry.dispose(); previewDot=null; }
+}
+
+// ── BUILD ─────────────────────────────────────────────────────────────────────
+function finishBuild() {
+  clearPreview(); clearDots(['build']);
+  if (buildSubType === 'polygon') {
+    if (buildPts.length >= 3) {
+      const poly = new PolygonShape(buildPts);
+      poly.rebuild();
+      polygons.push(poly);
+    }
+  } else if (buildSubType === 'ribbon') {
+    if (buildPts.length >= 2) {
+      const r = new RibbonShape(buildPts);
+      r.rebuild();
+      ribbons.push(r);
+    }
+  } else {
+    if (buildPts.length >= 2) {
+      for (let i=0; i<buildPts.length-1; i++) {
+        const sp=getOrMakePt(buildPts[i]), ep=getOrMakePt(buildPts[i+1]);
+        if (sp===ep) continue;
+        if (segments.find(s=>(s.start===sp&&s.end===ep)||(s.start===ep&&s.end===sp))) continue;
+        const seg = new RoadSeg(sp, ep);
+        seg.rebuild(); segments.push(seg);
+      }
+      rebuildAllJunctions();
+      rebuildGlobalDots();
+    }
+  }
+  buildPts=[]; updateBuildCounter();
+}
+
+function updateBuildCounter() {
+  const el=document.getElementById('build-counter');
+  const fb=document.getElementById('build-finish-btn');
+  const bst=document.getElementById('build-subtype');
+  if (appMode==='build') {
+    el.style.display='block'; el.textContent=buildPts.length+' POINTS';
+    const minPts = buildSubType==='polygon' ? 3 : 2;
+    fb.style.display=buildPts.length>=minPts?'block':'none';
+    fb.textContent=buildSubType==='polygon'?'◈ Finish Polygon':buildSubType==='ribbon'?'⌇ Finish Line':'✓ Finish Road';
+    if(bst) bst.style.display='flex';
+  } else {
+    el.style.display='none'; fb.style.display='none';
+    if(bst) bst.style.display='none';
+  }
+}
+
+// ── CAMERA PRESETS ────────────────────────────────────────────────────────────
+function camPerspective() { isTopDown=false; camTheta=0.6; camPhi=1.0; camRadius=50; updateCamera(); }
+function camTopDown() { isTopDown=true; camRadius=60; updateCamera(); }
+function camFront() { isTopDown=false; camTheta=0; camPhi=Math.PI*0.38; camRadius=50; updateCamera(); }
+
+// ── POLYGON UI ────────────────────────────────────────────────────────────────
+function setBuildSubType(t) {
+  buildSubType = t;
+  ['road','poly','ribbon'].forEach(id => {
+    const el = document.getElementById('bst-'+id);
+    if (!el) return;
+    const match = (id==='poly'&&t==='polygon') || (id===t);
+    el.style.background = match ? 'var(--accent)' : 'transparent';
+    el.style.color      = match ? '#fff' : 'var(--text-dim)';
+  });
+  document.getElementById('poly-defaults-section').style.display    = t==='polygon' ? 'block' : 'none';
+  document.getElementById('ribbon-defaults-section').style.display  = t==='ribbon'  ? 'block' : 'none';
+  clearPreview(); clearDots(['build']); buildPts=[];
+  updateBuildCounter();
+}
+
+function applyPolyGlobal() {
+  GP.fillColor    = document.getElementById('gp-fill').value;
+  GP.outlineColor = document.getElementById('gp-outline').value;
+  GP.outlineWidth = parseFloat(document.getElementById('gp-owidth').value);
+  GP.opacity      = parseFloat(document.getElementById('gp-opacity').value);
+  document.getElementById('gpow-v').textContent = GP.outlineWidth.toFixed(1)+'m';
+  document.getElementById('gpo-v').textContent  = Math.round(GP.opacity*100)+'%';
+}
+
+function setPolyGlobalFilled(v) {
+  GP.filled = v;
+  document.getElementById('gpf-yes').classList.toggle('active', v);
+  document.getElementById('gpf-no').classList.toggle('active', !v);
+}
+
+function polyCenter(poly) {
+  let cx=0, cz=0;
+  for (const p of poly.pts) { cx+=p.x; cz+=p.z; }
+  return { x: cx/poly.pts.length, z: cz/poly.pts.length };
+}
+function ribbonCenter(r) {
+  const n=r.pts.length; if(!n)return{x:0,z:0};
+  return{x:r.pts.reduce((s,p)=>s+p.x,0)/n, z:r.pts.reduce((s,p)=>s+p.z,0)/n};
+}
+
+
+function applyPolySize() {
+  if (!selectedPoly) return;
+  const pct = parseFloat(document.getElementById('sp-size').value) / 100;
+  document.getElementById('sps-v').textContent = Math.round(pct*100)+'%';
+  const c = polyCenter(selectedPoly);
+  // Scale pts from centroid using basePts
+  if (!selectedPoly._basePts) return;
+  selectedPoly.pts = selectedPoly._basePts.map(p =>
+    new THREE.Vector3(c.x + (p.x - c.x)*pct, 0, c.z + (p.z - c.z)*pct)
+  );
+  selectedPoly.scale = pct;
+  selectedPoly.rebuild();
+  selectedPoly.setEmissive(0x2244cc);
+}
+
+function selectPoly(poly) {
+  if (selectedPoly) selectedPoly.setEmissive(0x000000);
+  deselectRoad();
+  selectedPoly = poly;
+  poly.setEmissive(0x2244cc);
+  document.getElementById('no-sel').style.display='none';
+  document.getElementById('seg-props').style.display='none';
+  document.getElementById('poly-props').style.display='block';
+  document.getElementById('poly-label').textContent='POLY #'+poly.id;
+  document.getElementById('sp-fill').value    = poly.fillColor;
+  document.getElementById('sp-outline').value = poly.outlineColor;
+  document.getElementById('sp-owidth').value  = poly.outlineWidth;
+  document.getElementById('spow-v').textContent= poly.outlineWidth.toFixed(1)+'m';
+  document.getElementById('sp-opacity').value = poly.opacity;
+  document.getElementById('spo-v').textContent= Math.round(poly.opacity*100)+'%';
+  document.getElementById('sp-rot').value = poly.rotation||0;
+  document.getElementById('spr-v').textContent = (poly.rotation||0)+'°';
+  document.getElementById('spf-yes').classList.toggle('active',  poly.filled);
+  document.getElementById('spf-no').classList.toggle('active', !poly.filled);
+  // Store base pts for size slider
+  poly._basePts = poly.pts.map(p=>p.clone());
+  poly.scale = poly.scale || 1.0;
+  document.getElementById('sp-size').value = Math.round((poly.scale||1)*100);
+  document.getElementById('sps-v').textContent = Math.round((poly.scale||1)*100)+'%';
+}
+
+function deselectPoly() {
+  if (selectedPoly) selectedPoly.setEmissive(0x000000);
+  selectedPoly = null;
+  document.getElementById('poly-props').style.display='none';
+  document.getElementById('no-sel').style.display='block';
+}
+
+function deselectRoad() {
+  if (selectedSeg) selectedSeg.setEmissive(0x000000);
+  selectedSeg = null;
+}
+
+function applyPolySegment() {
+  if (!selectedPoly) return;
+  selectedPoly.fillColor    = document.getElementById('sp-fill').value;
+  selectedPoly.outlineColor = document.getElementById('sp-outline').value;
+  selectedPoly.outlineWidth = parseFloat(document.getElementById('sp-owidth').value);
+  selectedPoly.opacity      = parseFloat(document.getElementById('sp-opacity').value);
+  selectedPoly.rotation     = parseFloat(document.getElementById('sp-rot').value);
+  document.getElementById('spr-v').textContent = selectedPoly.rotation+'°';
+  document.getElementById('spow-v').textContent = selectedPoly.outlineWidth.toFixed(1)+'m';
+  document.getElementById('spo-v').textContent  = Math.round(selectedPoly.opacity*100)+'%';
+  selectedPoly.rebuild();
+  selectedPoly.setEmissive(0x2244cc);
+}
+
+function setPolyFilled(v) {
+  if (!selectedPoly) return;
+  selectedPoly.filled = v;
+  document.getElementById('spf-yes').classList.toggle('active',  v);
+  document.getElementById('spf-no').classList.toggle('active', !v);
+  selectedPoly.rebuild();
+  selectedPoly.setEmissive(0x2244cc);
+}
+
+function deleteSelectedPoly() {
+  if (!selectedPoly) return;
+  selectedPoly.destroy();
+  polygons = polygons.filter(p => p !== selectedPoly);
+  selectedPoly = null;
+  document.getElementById('poly-props').style.display='none';
+  document.getElementById('no-sel').style.display='block';
+}
+
+// ── MODE ──────────────────────────────────────────────────────────────────────
+const STATUS = {
+  view: 'VIEW — drag: orbit · middle: pan · scroll: zoom',
+  build: 'BUILD — click: point · Enter/dbl-click: finish · X: lock X-axis · Z: lock Z-axis',
+  edit: 'EDIT — click: select segment · drag dots: move · Del: delete'
+};
+
+function setMode(m) {
+  if (appMode==='build') finishBuild();
+  appMode=m; axisLock=null; updateAxisLockUI();
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  const ids={view:'btn-view',build:'btn-build',edit:'btn-edit'};
+  if (ids[m]) document.getElementById(ids[m]).classList.add('active');
+  document.body.className='mode-'+m;
+  document.getElementById('status').textContent=STATUS[m];
+  document.getElementById('right-panel').style.display=m==='edit'?'block':'none';
+  if (m!=='edit') { deselect(); clearDots(['edit','ctrl']); }
+  if (m==='edit') buildEditDotMeshes();
+  if (m==='build') {
+    buildPts=[]; updateBuildCounter();
+    document.getElementById('poly-defaults-section').style.display   = buildSubType==='polygon' ? 'block' : 'none';
+    document.getElementById('ribbon-defaults-section').style.display = buildSubType==='ribbon'  ? 'block' : 'none';
+  } else {
+    clearPreview(); updateBuildCounter();
+    document.getElementById('poly-defaults-section').style.display   = 'none';
+    document.getElementById('ribbon-defaults-section').style.display = 'none';
+  }
+}
+
+function updateAxisLockUI() {
+  const el = document.getElementById('axis-lock');
+  if (!axisLock||appMode!=='build') { el.style.display='none'; return; }
+  el.style.display='block';
+  el.className=axisLock;
+  el.textContent=axisLock==='x'?'⟷ X-AXIS LOCKED':'↕ Z-AXIS LOCKED';
+}
+
+// ── SELECTION ─────────────────────────────────────────────────────────────────
+function select(seg) {
+  if (selectedSeg) selectedSeg.setEmissive(0x000000);
+  selectedSeg=seg;
+  if (seg) {
+    seg.setEmissive(0x2244cc);
+    document.getElementById('no-sel').style.display='none';
+    document.getElementById('seg-props').style.display='block';
+    document.getElementById('seg-label').textContent='SEG #'+seg.id;
+    document.getElementById('s-color').value=seg.color;
+    document.getElementById('s-width').value=seg.width; document.getElementById('sw-v').textContent=seg.width+'m';
+    document.getElementById('s-thick').value=seg.thickness; document.getElementById('st-v').textContent=seg.thickness+'m';
+    document.getElementById('s-opacity').value=seg.opacity!==undefined?seg.opacity:1;
+    document.getElementById('so-v').textContent=Math.round((seg.opacity!==undefined?seg.opacity:1)*100)+'%';
+    const segDir = seg.direction || 'forward';
+    ['forward','backward','none'].forEach(d => {
+      document.getElementById('sd-'+d).classList.toggle('active', d===segDir);
+    });
+    document.getElementById('rt-straight').classList.toggle('active',seg.type==='straight');
+    document.getElementById('rt-curved').classList.toggle('active',seg.type==='curved');
+    document.getElementById('curve-actions').style.display=seg.type==='curved'?'block':'none';
+    buildEditDotMeshes();
+  }
+}
+
+function deselect() {
+  if (selectedSeg) selectedSeg.setEmissive(0x000000);
+  selectedSeg=null;
+  document.getElementById('no-sel').style.display='block';
+  document.getElementById('seg-props').style.display='none';
+  // keep poly-props hidden unless a poly is selected
+  if (!selectedPoly) document.getElementById('poly-props').style.display='none';
+  document.getElementById('ribbon-props').style.display='none';
+  buildEditDotMeshes();
+}
+
+function deleteSelected() {
+  if (!selectedSeg) return;
+  selectedSeg.destroy();
+  segments=segments.filter(s=>s!==selectedSeg);
+  selectedSeg=null;
+  netPts=netPts.filter(p=>segments.some(s=>s.start===p||s.end===p));
+  for (const [pt,mesh] of junctionMeshes) {
+    if (!netPts.includes(pt)) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); junctionMeshes.delete(pt); }
+  }
+  rebuildAllJunctions(); rebuildGlobalDots();
+  document.getElementById('no-sel').style.display='block';
+  document.getElementById('seg-props').style.display='none';
+  buildEditDotMeshes();
+}
+
+function clearAll(silent) {
+  if (!silent && (segments.length||polygons.length) && !confirm('Clear all?')) return;
+  segments.forEach(s=>s.destroy()); segments=[]; netPts=[]; buildPts=[];
+  for (const mesh of junctionMeshes.values()) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
+  junctionMeshes.clear();
+  polygons.forEach(p=>p.destroy()); polygons=[];
+  trucks.forEach(t=>t.destroy()); trucks=[]; deselectTruck();
+  ribbons.forEach(r=>r.destroy()); ribbons=[]; deselectRibbon();
+  textObjects.forEach(t=>t.destroy()); textObjects=[]; deselectText();
+  clearPreview(); clearDots(); rebuildGlobalDots(); deselect(); deselectPoly();
+}
+
+function flipCurve() {
+  if (!selectedSeg||selectedSeg.type!=='curved') return;
+  selectedSeg.flipCurve();
+  selectedSeg.setEmissive(0x2244cc);
+  buildEditDotMeshes();
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+function exportOBJ() {
+  if (!segments.length) { alert('No roads to export.'); return; }
+  openExportModal();
+}
+
+function openExportModal() {
+  let modal = document.getElementById('export-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'export-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:200;display:flex;align-items:center;justify-content:center;';
+
+    const inner = document.createElement('div');
+    inner.style.cssText = 'background:#0a0e18;border:1px solid rgba(80,130,255,0.22);border-radius:12px;padding:20px;width:600px;max-width:94vw;max-height:88vh;display:flex;flex-direction:column;gap:12px;';
+
+    inner.innerHTML = [
+      // header
+      '<div style="display:flex;align-items:center;justify-content:space-between">',
+        '<span style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;color:#00d4ff;text-transform:uppercase">OBJ Export</span>',
+        '<button id="exp-close" style="background:none;border:none;color:#4a6080;font-size:18px;cursor:pointer;line-height:1">&#x2715;</button>',
+      '</div>',
+      // options row
+      '<div style="display:flex;gap:20px;padding:10px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(80,130,255,0.1);border-radius:7px;">',
+        '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:600;color:#a8b8d0;">',
+          '<input type="checkbox" id="exp-colors" checked style="accent-color:#3a78ff;width:14px;height:14px;cursor:pointer;">',
+          'Include Colors <span style="color:#4a6080;font-size:10px;font-family:JetBrains Mono,monospace;margin-left:2px">(OBJ+MTL)</span>',
+        '</label>',
+        '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:600;color:#a8b8d0;">',
+          '<input type="checkbox" id="exp-grid" style="accent-color:#3a78ff;width:14px;height:14px;cursor:pointer;">',
+          'Include Grid <span style="color:#4a6080;font-size:10px;font-family:JetBrains Mono,monospace;margin-left:2px">(as lines)</span>',
+        '</label>',
+      '</div>',
+      // tab bar (shown only when colors checked)
+      '<div id="exp-tabs" style="display:flex;gap:4px;">',
+        '<button id="exp-tab-obj" style="padding:5px 14px;border-radius:5px 5px 0 0;border:1px solid rgba(80,130,255,0.25);border-bottom:none;background:rgba(58,120,255,0.15);color:#3a78ff;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">roadcraft.obj</button>',
+        '<button id="exp-tab-mtl" style="padding:5px 14px;border-radius:5px 5px 0 0;border:1px solid rgba(80,130,255,0.1);border-bottom:none;background:transparent;color:#4a6080;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">roadcraft.mtl</button>',
+      '</div>',
+      // textarea
+      '<textarea id="exp-text" readonly style="flex:1;min-height:260px;background:#060a14;color:#8a9ab0;border:1px solid rgba(80,130,255,0.12);border-radius:0 6px 6px 6px;font-family:JetBrains Mono,monospace;font-size:9px;padding:10px;resize:none;outline:none;line-height:1.6;margin-top:-1px;"></textarea>',
+      // hint
+      '<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:#4a6080;line-height:1.8" id="exp-hint">' +
+      '<strong style="color:#a8b8d0">OBJ</strong> = geometry &nbsp;|&nbsp; <strong style="color:#a8b8d0">MTL</strong> = colours<br>' +
+      '① Copy each tab → save as <strong style="color:#7ab0d0">roadcraft.obj</strong> &amp; <strong style="color:#7ab0d0">roadcraft.mtl</strong> in the <em>same folder</em><br>' +
+      '② Blender: <strong style="color:#a8b8d0">File → Import → Wavefront (.obj)</strong> → select roadcraft.obj<br>' +
+      '③ Colours load automatically if .mtl is in same folder<br>' +
+      '④ If colours are grey: open Shader Editor → each material → add Image Texture node' +
+      '</div>',
+      // copy button
+      '<button id="exp-copy" style="background:rgba(58,120,255,0.12);color:#3a78ff;border:1px solid rgba(58,120,255,0.35);border-radius:6px;padding:9px;font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;">COPY TO CLIPBOARD</button>',
+    ].join('');
+
+    modal.appendChild(inner);
+    document.body.appendChild(modal);
+
+    // Wire up close
+    document.getElementById('exp-close').addEventListener('click', () => modal.style.display = 'none');
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+
+    // Wire up copy
+    document.getElementById('exp-copy').addEventListener('click', () => {
+      const ta = document.getElementById('exp-text');
+      ta.select();
+      try { document.execCommand('copy'); } catch(e) {}
+      const btn = document.getElementById('exp-copy');
+      btn.textContent = '\u2713 COPIED!';
+      setTimeout(() => btn.textContent = 'COPY TO CLIPBOARD', 2200);
+    });
+
+    // Tabs
+    document.getElementById('exp-tab-obj').addEventListener('click', () => switchExpTab('obj'));
+    document.getElementById('exp-tab-mtl').addEventListener('click', () => switchExpTab('mtl'));
+
+    // Re-generate when options change
+    document.getElementById('exp-colors').addEventListener('change', generateExport);
+    document.getElementById('exp-grid').addEventListener('change', generateExport);
+  }
+  modal.style.display = 'flex';
+  generateExport();
+}
+
+let _expData = { obj: '', mtl: '' };
+let _expTab = 'obj';
+
+function switchExpTab(tab) {
+  _expTab = tab;
+  const isObj = tab === 'obj';
+  const tabObj = document.getElementById('exp-tab-obj');
+  const tabMtl = document.getElementById('exp-tab-mtl');
+  tabObj.style.background = isObj ? 'rgba(58,120,255,0.15)' : 'transparent';
+  tabObj.style.color = isObj ? '#3a78ff' : '#4a6080';
+  tabMtl.style.background = !isObj ? 'rgba(58,120,255,0.15)' : 'transparent';
+  tabMtl.style.color = !isObj ? '#3a78ff' : '#4a6080';
+  document.getElementById('exp-text').value = isObj ? _expData.obj : _expData.mtl;
+  const hint = document.getElementById('exp-hint');
+  const fn = isObj ? 'roadcraft.obj' : 'roadcraft.mtl';
+  hint.innerHTML = 'Save as <strong style="color:#6a8090">' + fn + '</strong> and import into Blender / Rhino.';
+}
+
+function generateExport() {
+  const withColors = document.getElementById('exp-colors').checked;
+  const withGrid   = document.getElementById('exp-grid').checked;
+
+  const objLines = ['# RoadCraft OBJ Export', '# Units: meters', ''];
+  const mtlLines = ['# RoadCraft MTL', ''];
+  const usedColors = new Set();
+
+  if (withColors) objLines.push('mtllib roadcraft.mtl', '');
+
+  let vOffset = 1;
+
+  // ── Road meshes (segments + junctions) ───────────────────────────────────
+  const allMeshes = [
+    ...segments.map(s => ({ mesh: s.mesh, color: s.color, label: 'seg_' + s.id })).filter(m => m.mesh),
+    // Direction arrows (flat triangles, sit above road)
+    ...segments.filter(s=>s.arrowMesh).map(s => ({ mesh: s.arrowMesh, color: lightenHex(s.color,0.82), label: 'arrow_' + s.id })),
+    ...Array.from(junctionMeshes.entries()).map(([pt,mesh],i) => ({ mesh, color: '#'+mesh.material.color.getHexString(), label: 'junc_' + i })),
+    // Polygon fills
+    ...polygons.filter(p => p.fillMesh).map(p => ({ mesh: p.fillMesh, color: p.fillColor, label: 'poly_fill_' + p.id })),
+    // Polygon outlines
+    ...polygons.flatMap(p => p.outlineMeshes.map((m,i) => ({ mesh: m, color: p.outlineColor, label: 'poly_outline_' + p.id + '_' + i }))),
+    // Ribbons
+    ...ribbons.filter(r=>r.mesh).map(r => ({ mesh: r.mesh, color: r.color, label: 'ribbon_' + r.id })),
+    // Text (exported as flat plane)
+    ...textObjects.filter(t=>t.mesh).map(t => ({ mesh: t.mesh, color: t.color, label: 'text_' + t.id })),
+    // Trucks (each mesh in the group)
+    ...trucks.flatMap(t => { const ms=[]; t.group&&t.group.traverse(m=>{if(m.isMesh)ms.push({mesh:m,color:'#'+m.material.color.getHexString(),label:'truck_'+t.id+'_'+ms.length}); }); return ms; }),
+  ];
+
+  allMeshes.forEach(({ mesh, color, label }) => {
+    const geo = mesh.geometry;
+    const posAttr = geo.attributes.position;
+    const idxAttr = geo.index;
+    const matName = 'mat_' + color.replace('#','');
+
+    objLines.push('o ' + label);
+    if (withColors) {
+      objLines.push('usemtl ' + matName);
+      usedColors.add(color.startsWith('#') ? color : '#' + color);
+    }
+
+    const v = new THREE.Vector3();
+    for (let i = 0; i < posAttr.count; i++) {
+      v.fromBufferAttribute(posAttr, i).applyMatrix4(mesh.matrixWorld);
+      objLines.push('v ' + v.x.toFixed(5) + ' ' + v.y.toFixed(5) + ' ' + (-v.z).toFixed(5));
+    }
+    objLines.push('g ' + label);
+    for (let i = 0; i < idxAttr.count; i += 3) {
+      const a = idxAttr.getX(i)+vOffset, b = idxAttr.getX(i+1)+vOffset, c = idxAttr.getX(i+2)+vOffset;
+      objLines.push('f ' + a + ' ' + b + ' ' + c);
+    }
+    objLines.push('');
+    vOffset += posAttr.count;
+  });
+
+  // ── Grid as line objects ─────────────────────────────────────────────────
+  if (withGrid) {
+    const gridSize = 80, divs = 80;
+    const step = gridSize / divs;
+    const half = gridSize / 2;
+    const gridColor = document.getElementById('grid-col') ? document.getElementById('grid-col').value : '#3d3008';
+
+    objLines.push('o grid');
+    if (withColors) {
+      objLines.push('usemtl mat_grid');
+      usedColors.add(gridColor);
+    }
+
+    // Emit all grid verts, then line elements
+    const gridVBase = vOffset;
+    // Lines parallel to X axis (varying Z)
+    for (let i = 0; i <= divs; i++) {
+      const z = -half + i * step;
+      objLines.push('v ' + (-half).toFixed(3) + ' 0.020 ' + (-z).toFixed(3));
+      objLines.push('v ' + half.toFixed(3)  + ' 0.020 ' + (-z).toFixed(3));
+    }
+    // Lines parallel to Z axis (varying X)
+    const zBase = gridVBase + (divs + 1) * 2;
+    for (let i = 0; i <= divs; i++) {
+      const x = -half + i * step;
+      objLines.push('v ' + x.toFixed(3) + ' 0.020 ' + half.toFixed(3));
+      objLines.push('v ' + x.toFixed(3) + ' 0.020 ' + (-half).toFixed(3));
+    }
+    // Line elements — X-parallel
+    for (let i = 0; i <= divs; i++) {
+      const a = gridVBase + i * 2, b = a + 1;
+      objLines.push('l ' + a + ' ' + b);
+    }
+    // Line elements — Z-parallel
+    for (let i = 0; i <= divs; i++) {
+      const a = zBase + i * 2, b = a + 1;
+      objLines.push('l ' + a + ' ' + b);
+    }
+    objLines.push('');
+
+    if (withColors) {
+      const gc = new THREE.Color(gridColor);
+      mtlLines.push('newmtl mat_grid');
+      mtlLines.push('Kd ' + gc.r.toFixed(4) + ' ' + gc.g.toFixed(4) + ' ' + gc.b.toFixed(4));
+      mtlLines.push('Ka 0.1 0.1 0.1');
+      mtlLines.push('Ks 0.0 0.0 0.0');
+      mtlLines.push('illum 1');
+      mtlLines.push('');
+    }
+  }
+
+  // ── MTL entries for used road colors ─────────────────────────────────────
+  if (withColors) {
+    for (const hex of usedColors) {
+      if (hex === (document.getElementById('grid-col') ? document.getElementById('grid-col').value : '#3d3008')) continue;
+      const c = new THREE.Color(hex);
+      const name = 'mat_' + hex.replace('#','');
+      mtlLines.push('newmtl ' + name);
+      mtlLines.push('Kd ' + c.r.toFixed(4) + ' ' + c.g.toFixed(4) + ' ' + c.b.toFixed(4));
+      mtlLines.push('Ka 0.1 0.1 0.1');
+      mtlLines.push('Ks 0.05 0.05 0.05');
+      mtlLines.push('illum 1');
+      mtlLines.push('');
+    }
+  }
+
+  _expData.obj = objLines.join('\n');
+  _expData.mtl = mtlLines.join('\n');
+
+  // Show/hide MTL tab
+  const tabMtl = document.getElementById('exp-tab-mtl');
+  if (tabMtl) tabMtl.style.display = withColors ? '' : 'none';
+
+  // Switch to OBJ tab and update textarea
+  switchExpTab('obj');
+}
+
+// ── INPUT ─────────────────────────────────────────────────────────────────────
+let orbitActive=false, panActive=false;
+let orbitX0=0,orbitY0=0,lastTheta=0,lastPhi=0;
+let panX0=0,panY0=0;
+let mdownX=0,mdownY=0;
+let lastClickTime=0, snapIndicatorTimeout=null;
+
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+
+canvas.addEventListener('mousedown', e=>{
+  mdownX=e.clientX; mdownY=e.clientY;
+
+  if (e.button===2) {
+    isTopDown=false;
+    orbitActive=true; orbitX0=e.clientX; orbitY0=e.clientY;
+    lastTheta=camTheta; lastPhi=camPhi; return;
+  }
+  if (e.button===1 || (e.button===0 && appMode==='view')) {
+    panActive=true; panX0=e.clientX; panY0=e.clientY; return;
+  }
+  if (e.button===0 && appMode==='edit') {
+    const rect=canvas.getBoundingClientRect();
+    mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+    mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+    raycaster.setFromCamera(mouse,camera);
+    // Check if clicking selected poly to drag it
+    if (selectedPoly) {
+      const pm = [selectedPoly.fillMesh, ...selectedPoly.outlineMeshes].filter(Boolean);
+      const ph = raycaster.intersectObjects(pm);
+      if (ph.length) {
+        const pos = getWorldAt(e);
+        if (pos) {
+          const cen = polyCenter(selectedPoly);
+          polyDragOffset = {x: pos.x - cen.x, z: pos.z - cen.z};
+          isDraggingPoly = true; return;
+        }
+      }
+    }
+    // Check if clicking selected text to drag it
+    if (selectedText && selectedText.mesh) {
+      const th=raycaster.intersectObjects([selectedText.mesh],false);
+      if(th.length){
+        const pos=getWorldAt(e);
+        if(pos){ textDragOffset={x:pos.x-selectedText.x,z:pos.z-selectedText.z}; isDraggingText=true; return; }
+      }
+    }
+    // Check if clicking selected ribbon to drag it
+    if (selectedRibbon) {
+      const rm = [selectedRibbon.mesh].filter(Boolean);
+      const rh = raycaster.intersectObjects(rm);
+      if (rh.length) {
+        const pos=getWorldAt(e);
+        if (pos) {
+          const cen=ribbonCenter(selectedRibbon);
+          ribbonDragOffset={x:pos.x-cen.x, z:pos.z-cen.z};
+          isDraggingRibbon=true; return;
+        }
+      }
+    }
+    // Check if clicking selected road segment body to drag it
+    if (selectedSeg && selectedSeg.mesh) {
+      const sh = raycaster.intersectObjects([selectedSeg.mesh]);
+      if (sh.length) {
+        const pos=getWorldAt(e);
+        if (pos) {
+          const mx=(selectedSeg.start.x+selectedSeg.end.x)/2;
+          const mz=(selectedSeg.start.z+selectedSeg.end.z)/2;
+          segDragOffset={x:pos.x-mx, z:pos.z-mz};
+          segDragStartPts={
+            sx:selectedSeg.start.x, sz:selectedSeg.start.z,
+            ex:selectedSeg.end.x,   ez:selectedSeg.end.z
+          };
+          isDraggingSeg=true; return;
+        }
+      }
+    }
+    // Check if clicking on selected truck to drag it
+    if (selectedTruck) {
+      const truckMeshes=[]; selectedTruck.group.traverse(m=>{if(m.isMesh)truckMeshes.push(m);});
+      const th=raycaster.intersectObjects(truckMeshes);
+      if (th.length) { isDraggingTruckFlag=true; truckDragTarget=selectedTruck; return; }
+    }
+    const allDotMeshes=dotObjects.map(d=>d.mesh);
+    const allDotHits=raycaster.intersectObjects(allDotMeshes);
+    if (allDotHits.length) {
+      const hit = dotObjects.find(d=>d.mesh===allDotHits[0].object);
+      if (hit) {
+        if (hit.type==='polyvert') { dragPolyVert=hit; isDraggingPolyVert=true; return; }
+        if (hit.type==='ribbonpt') { dragRibbonPt=hit; isDraggingRibbonPt=true; return; }
+        if (hit.type==='edit'||hit.type==='ctrl') { dragInfo=hit; isDraggingDot=true; }
+      }
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', e=>{
+  if (orbitActive) {
+    camTheta=lastTheta-(e.clientX-orbitX0)*0.005;
+    camPhi=Math.max(0.08,Math.min(Math.PI*0.47,lastPhi+(e.clientY-orbitY0)*0.005));
+    updateCamera(); return;
+  }
+  if (panActive) {
+    const dx=e.clientX-panX0, dy=e.clientY-panY0;
+    panX0=e.clientX; panY0=e.clientY;
+    const fwd=new THREE.Vector3(); camera.getWorldDirection(fwd); fwd.y=0; fwd.normalize();
+    const right=new THREE.Vector3(-fwd.z,0,fwd.x);
+    const spd=camRadius*0.0012;
+    camTarget.addScaledVector(right,-dx*spd); camTarget.addScaledVector(fwd,dy*spd);
+    updateCamera(); return;
+  }
+  const rect=canvas.getBoundingClientRect();
+  mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+
+  if (appMode==='edit' && isDraggingPoly && selectedPoly) {
+    const pos=getWorldAt(e); if(!pos) return;
+    const cen = polyCenter(selectedPoly);
+    const dx = (pos.x - polyDragOffset.x) - cen.x;
+    const dz = (pos.z - polyDragOffset.z) - cen.z;
+    selectedPoly.pts = selectedPoly.pts.map(p => new THREE.Vector3(p.x+dx,0,p.z+dz));
+    if (selectedPoly._basePts) selectedPoly._basePts = selectedPoly._basePts.map(p => new THREE.Vector3(p.x+dx,0,p.z+dz));
+    selectedPoly.rebuild(); selectedPoly.setEmissive(0x2244cc);
+    return;
+  }
+  if (appMode==='edit' && isDraggingRibbon && selectedRibbon) {
+    const pos=getWorldAt(e); if(!pos) return;
+    const cen=ribbonCenter(selectedRibbon);
+    const dx=(pos.x-ribbonDragOffset.x)-cen.x, dz=(pos.z-ribbonDragOffset.z)-cen.z;
+    selectedRibbon.pts=selectedRibbon.pts.map(p=>new THREE.Vector3(p.x+dx,0,p.z+dz));
+    selectedRibbon.rebuild(); selectedRibbon.setEmissive(0x2244cc);
+    return;
+  }
+  if (appMode==='edit' && isDraggingSeg && selectedSeg) {
+    const pos=getWorldAt(e); if(!pos) return;
+    const tx=pos.x-segDragOffset.x, tz=pos.z-segDragOffset.z;
+    const odx=selectedSeg.end.x-selectedSeg.start.x, odz=selectedSeg.end.z-selectedSeg.start.z;
+    const newSx=tx-(odx/2), newSz=tz-(odz/2);
+    selectedSeg.start.set(newSx,0,newSz);
+    selectedSeg.end.set(newSx+odx,0,newSz+odz);
+    // Rebuild ALL segments sharing these endpoints so adjacent roads follow with no gap
+    const affectedPts = new Set([selectedSeg.start, selectedSeg.end]);
+    for (const s of segments) {
+      if (affectedPts.has(s.start) || affectedPts.has(s.end)) {
+        s.rebuild();
+        rebuildJunction(s.start); rebuildJunction(s.end);
+      }
+    }
+    rebuildGlobalDots();
+    return;
+  }
+  if (appMode==='edit' && isDraggingText && selectedText) {
+    const pos=getWorldAt(e); if(!pos) return;
+    selectedText.x=pos.x-textDragOffset.x; selectedText.z=pos.z-textDragOffset.z;
+    selectedText._applyTransform();
+    document.getElementById('st-x').value=selectedText.x.toFixed(1);
+    document.getElementById('st-z').value=selectedText.z.toFixed(1);
+    document.getElementById('stx-v').textContent=selectedText.x.toFixed(1)+'m';
+    document.getElementById('stz-v').textContent=selectedText.z.toFixed(1)+'m';
+    return;
+  }
+  if (appMode==='edit' && isDraggingPolyVert && dragPolyVert) {
+    const pos=getWorldAt(e); if(!pos) return;
+    dragPolyVert.poly.pts[dragPolyVert.vi].set(pos.x,0,pos.z);
+    dragPolyVert.mesh.position.set(pos.x,0.5,pos.z);
+    dragPolyVert.poly.rebuild();
+    dragPolyVert.poly.setEmissive(0x2244cc);
+    return;
+  }
+  if (appMode==='edit' && isDraggingRibbonPt && dragRibbonPt) {
+    const pos=getWorldAt(e); if(!pos) return;
+    dragRibbonPt.ribbon.pts[dragRibbonPt.vi].set(pos.x,0,pos.z);
+    dragRibbonPt.mesh.position.set(pos.x,0.5,pos.z);
+    dragRibbonPt.ribbon.rebuild();
+    dragRibbonPt.ribbon.setEmissive(0x2244cc);
+    return;
+  }
+  if (appMode==='edit' && isDraggingTruckFlag && truckDragTarget) {
+    const pos=getWorldAt(e); if(!pos) return;
+    truckDragTarget.x=pos.x; truckDragTarget.z=pos.z;
+    truckDragTarget.group.position.set(pos.x, truckDragTarget.yOff||0.25, pos.z);
+    document.getElementById('tr-x').value=pos.x.toFixed(1);
+    document.getElementById('tr-z').value=pos.z.toFixed(1);
+    document.getElementById('tr-x-v').textContent=pos.x.toFixed(1)+'m';
+    document.getElementById('tr-z-v').textContent=pos.z.toFixed(1)+'m';
+    return;
+  }
+  if (appMode==='edit' && isDraggingDot && dragInfo) {
+    const pos=getWorldAt(e); if(!pos) return;
+    if (dragInfo.isCtrl) {
+      dragInfo.ptRef.set(pos.x,0,pos.z);
+      dragInfo.seg.ctrlPt=new THREE.Vector3(pos.x,0,pos.z);
+      dragInfo.seg.rebuild();
+      rebuildJunction(dragInfo.seg.start); rebuildJunction(dragInfo.seg.end);
+    } else {
+      const snap=findNearPt(pos,dragInfo.ptRef), dest=snap||pos;
+      dragInfo.ptRef.set(dest.x,0,dest.z);
+      for (const s of dragInfo.segs) { s.rebuild(); rebuildJunction(s.start); rebuildJunction(s.end); }
+      showSnap(!!snap);
+    }
+    dragInfo.mesh.position.set(dragInfo.ptRef.x, 0.5, dragInfo.ptRef.z);
+    rebuildGlobalDots(); return;
+  }
+
+  if (appMode==='build') {
+    let pos=getWorldAt(e); if(!pos) return;
+    pos=applyAxisLock(pos);
+    const snap=findNearPt(pos), dest=snap?snap.clone():pos;
+    showSnap(!!snap); updatePreview(dest);
+    if (!previewDot) previewDot=makeDotMesh(dest,snap?0x00ff88:0x88ccff,0.28);
+    else { previewDot.position.set(dest.x,0.3,dest.z); previewDot.material.color.set(snap?0x00ff88:0x88ccff); }
+  }
+
+  if (appMode==='edit' && !isDraggingDot) {
+    const roadMeshes=segments.map(s=>s.mesh).filter(Boolean);
+    const hits=raycaster.intersectObjects(roadMeshes);
+    if (hoveredSeg && hoveredSeg!==selectedSeg) { hoveredSeg.setEmissive(0x000000); hoveredSeg=null; }
+    if (hits.length) {
+      const seg=segments.find(s=>s.mesh===hits[0].object);
+      if (seg&&seg!==selectedSeg) { seg.setEmissive(0x113388); hoveredSeg=seg; }
+    }
+  }
+});
+
+function showSnap(on) {
+  const el=document.getElementById('snap-indicator');
+  if (on) { el.style.display='block'; clearTimeout(snapIndicatorTimeout); snapIndicatorTimeout=setTimeout(()=>el.style.display='none',600); }
+}
+
+canvas.addEventListener('mouseup', e=>{
+  if (e.button===2) { orbitActive=false; return; }
+  if (e.button===1) { panActive=false; return; }
+  if (e.button===0 && appMode==='view') { panActive=false; return; }
+
+  if (isDraggingPoly) { isDraggingPoly=false; return; }
+  if (isDraggingText) { isDraggingText=false; return; }
+  if (isDraggingPolyVert) { isDraggingPolyVert=false; dragPolyVert=null; buildEditDotMeshes(); return; }
+  if (isDraggingRibbonPt) { isDraggingRibbonPt=false; dragRibbonPt=null; buildEditDotMeshes(); return; }
+  if (isDraggingRibbon) { isDraggingRibbon=false; return; }
+  if (isDraggingSeg) { isDraggingSeg=false; segDragStartPts=null; rebuildAllJunctions(); rebuildGlobalDots(); buildEditDotMeshes(); return; }
+  if (isDraggingTruckFlag) {
+    isDraggingTruckFlag=false; truckDragTarget=null; return;
+  }
+  if (isDraggingDot) {
+    if (!dragInfo.isCtrl) {
+      const pt=dragInfo.ptRef;
+      const near=netPts.find(p=>p!==pt&&p.distanceTo(pt)<SN.pointSnap);
+      if (near) {
+        for (const seg of segments) { if(seg.start===pt)seg.start=near; if(seg.end===pt)seg.end=near; }
+        netPts=netPts.filter(p=>p!==pt);
+        segments.forEach(s=>{if(s.start===near||s.end===near)s.rebuild();});
+        rebuildAllJunctions(); rebuildGlobalDots();
+      }
+    }
+    isDraggingDot=false; dragInfo=null; buildEditDotMeshes(); return;
+  }
+
+  const dx=e.clientX-mdownX, dy=e.clientY-mdownY;
+  if (Math.sqrt(dx*dx+dy*dy)>6) return;
+
+  if (appMode==='build') {
+    let pos=getWorldAt(e); if(!pos) return;
+    pos=applyAxisLock(pos);
+    const now=Date.now(), isDouble=(now-lastClickTime)<300;
+    lastClickTime=now;
+    const minToFinish = buildSubType==='polygon' ? 3 : 2; // ribbon also needs 2
+    if (isDouble&&buildPts.length>=minToFinish) { finishBuild(); return; }
+    const snap=findNearPt(pos);
+    buildPts.push(snap?snap.clone():pos.clone());
+    buildDotMeshes(); updateBuildCounter();
+  }
+
+  if (appMode==='edit') {
+    const rect=canvas.getBoundingClientRect();
+    mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+    mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+    raycaster.setFromCamera(mouse,camera);
+    // Check roads first (higher priority), then polygons
+    const roadMeshes=segments.map(s=>s.mesh).filter(Boolean);
+    const roadHits=raycaster.intersectObjects(roadMeshes);
+    if (roadHits.length) {
+      const seg=segments.find(s=>s.mesh===roadHits[0].object);
+      if(seg) { deselectPoly(); select(seg); return; }
+    }
+    // Check polygon meshes
+    const polyMeshes=[...polygons.map(p=>p.fillMesh).filter(Boolean), ...polygons.flatMap(p=>p.outlineMeshes)];
+    const polyHits=raycaster.intersectObjects(polyMeshes);
+    if (polyHits.length) {
+      const pid=polyHits[0].object.userData.polyId;
+      const poly=polygons.find(p=>p.id===pid);
+      if(poly) { deselect(); selectPoly(poly); buildEditDotMeshes(); return; }
+    }
+    // Check truck meshes
+    // Check ribbon meshes
+    const ribbonMeshes=ribbons.map(r=>r.mesh).filter(Boolean);
+    const ribbonHits=raycaster.intersectObjects(ribbonMeshes, false);
+    if(ribbonHits.length){
+      const rid=ribbonHits[0].object.userData.ribbonId;
+      const r=ribbons.find(x=>x.id===rid);
+      if(r){deselect();deselectPoly();deselectTruck();selectRibbon(r);buildEditDotMeshes();return;}
+    }
+    // Check text meshes
+    const textMeshes=textObjects.map(t=>t.mesh).filter(Boolean);
+    const textHits=raycaster.intersectObjects(textMeshes,false);
+    if(textHits.length){
+      const tid=textHits[0].object.userData.textId;
+      const t=textObjects.find(t=>t.id===tid);
+      if(t){deselectAll();selectText(t);return;}
+    }
+    const truckHitMeshes=trucks.flatMap(t=>{const m=[];t.group.traverse(x=>{if(x.isMesh)m.push(x);});return m;});
+    const truckHits=raycaster.intersectObjects(truckHitMeshes);
+    if(truckHits.length){
+      const tid=truckHits[0].object.userData.truckId;
+      const truck=trucks.find(t=>t.id===tid);
+      if(truck){deselect();deselectPoly();selectTruck(truck);return;}
+    }
+    deselect(); deselectPoly(); deselectTruck(); deselectRibbon(); deselectText();
+  }
+});
+
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  camRadius*=(1+e.deltaY*0.001);
+  camRadius=Math.max(5,Math.min(300,camRadius));
+  updateCamera();
+},{passive:false});
+
+document.addEventListener('keydown', e=>{
+  if ((e.ctrlKey||e.metaKey) && e.key==='c') { e.preventDefault(); copySelected(); return; }
+  if ((e.ctrlKey||e.metaKey) && e.key==='v') { e.preventDefault(); pasteSelected(); return; }
+  if (e.target.tagName==='INPUT') return;
+  if (e.key==='Escape') {
+    if (appMode==='build') { if(buildPts.length>=2) finishBuild(); else { buildPts=[]; clearPreview(); clearDots(['build']); updateBuildCounter(); } }
+    else if (appMode==='edit') deselect();
+  }
+  if ((e.key==='Delete'||e.key==='Backspace')&&appMode==='edit') deleteSelected();
+  if (e.key==='Enter'&&appMode==='build') finishBuild();
+  if (e.key==='v'||e.key==='V') setMode('view');
+  if (e.key==='b'||e.key==='B') setMode('build');
+  if (e.key==='e'||e.key==='E') setMode('edit');
+  if (e.key==='p'||e.key==='P') togglePointVis();
+  if (appMode==='build') {
+    if (e.key==='x'||e.key==='X') { axisLock=axisLock==='x'?null:'x'; updateAxisLockUI(); }
+    if (e.key==='z'||e.key==='Z') { axisLock=axisLock==='z'?null:'z'; updateAxisLockUI(); }
+  }
+});
+
+// ── SETTINGS ──────────────────────────────────────────────────────────────────
+function setGlobalDir(dir) {
+  G.direction = dir;
+  ['forward','backward','none'].forEach(d => {
+    document.getElementById('gd-'+d).classList.toggle('active', d===dir);
+  });
+}
+
+function applyGlobal() {
+  G.color=document.getElementById('g-color').value;
+  G.width=parseFloat(document.getElementById('g-width').value);
+  G.thickness=parseFloat(document.getElementById('g-thick').value);
+  G.opacity=parseFloat(document.getElementById('g-opacity').value);
+  document.getElementById('gw-v').textContent=G.width+'m';
+  document.getElementById('gt-v').textContent=G.thickness+'m';
+  document.getElementById('go-v').textContent=Math.round(G.opacity*100)+'%';
+}
+
+// ── SKY & GROUND GRADIENT PRESETS ───────────────────────────────────────────
+// Each preset: [label, skyTop, skyBot, groundTop, groundBot, fogColor]
+// Sky and ground use a canvas gradient texture together for a seamless look
+const SKY_PRESETS = [
+  ['Twilight Purple', '#1a0830', '#0d0520', '#0a0318', '#060210', '#1a0830'],
+  ['Midnight Black',  '#0a0a0f', '#050508', '#040405', '#020203', '#0a0a0f'],
+  ['Night City',      '#0e1830', '#040810', '#0c1228', '#060912', '#0e1830'],
+  ['Deep Space',      '#0d0520', '#070212', '#080315', '#04010a', '#0d0520'],
+  ['Ocean Dusk',      '#0d2137', '#051422', '#081520', '#040e16', '#0d2137'],
+  ['Ember Dusk',      '#2c1810', '#0f0804', '#1a0e08', '#0d0704', '#2c1810'],
+  ['Forest Night',    '#1a2a0a', '#0a1405', '#101a06', '#080e03', '#1a2a0a'],
+  ['Desert Dusk',     '#3a2a00', '#1a1200', '#201800', '#110d00', '#3a2a00'],
+  ['Storm Grey',      '#1a1e28', '#0e1018', '#121520', '#080a10', '#1a1e28'],
+  ['Overcast',        '#b0c8e8', '#8aaac8', '#6a8090', '#405060', '#b0c8e8'],
+  ['Clear Day',       '#87ceeb', '#d4ecff', '#4a8060', '#2a5040', '#87ceeb'],
+];
+let currentSkyIdx = 0;
+
+function makeSkyTexture(topHex, botHex) {
+  const c = document.createElement('canvas');
+  c.width = 2; c.height = 256;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,0,256);
+  grad.addColorStop(0, topHex);
+  grad.addColorStop(1, botHex);
+  ctx.fillStyle = grad; ctx.fillRect(0,0,2,256);
+  return new THREE.CanvasTexture(c);
+}
+
+function applySkyPreset(idx) {
+  currentSkyIdx = idx;
+  const [label, skyTop, skyBot, gndTop, gndBot, fogCol] = SKY_PRESETS[idx];
+  // Sky background gradient
+  scene.background = makeSkyTexture(skyTop, skyBot);
+  // Ground — use a plain color (midpoint of ground gradient)
+  const gndMid = blendHex(gndTop, gndBot, 0.5);
+  gndMesh.material.color.set(new THREE.Color(gndMid));
+  scene.fog.color.set(new THREE.Color(fogCol));
+  const sel = document.getElementById('sky-select');
+  if (sel) sel.value = idx;
+}
+
+function blendHex(a, b, t) {
+  const ah = parseInt(a.slice(1),16), bh = parseInt(b.slice(1),16);
+  const ar=(ah>>16)&0xff, ag=(ah>>8)&0xff, ab_=ah&0xff;
+  const br=(bh>>16)&0xff, bg=(bh>>8)&0xff, bb_=bh&0xff;
+  const rr=Math.round(ar+(br-ar)*t), rg=Math.round(ag+(bg-ag)*t), rb=Math.round(ab_+(bb_-ab_)*t);
+  return '#'+((1<<24)|(rr<<16)|(rg<<8)|rb).toString(16).slice(1);
+}
+
+function buildSkySwatches() {
+  const sel = document.getElementById('sky-select');
+  if (!sel) return;
+  SKY_PRESETS.forEach(([label], i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = label;
+    sel.appendChild(opt);
+  });
+  sel.value = 0;
+}
+
+function applyScene() {
+  const grid = document.getElementById('grid-col').value;
+  scene.remove(gridHelper);
+  gridHelper = new THREE.GridHelper(120,120,new THREE.Color(grid),new THREE.Color(grid));
+  gridHelper.position.y = 0.01; scene.add(gridHelper);
+}
+
+function applySnap() {
+  SN.grid=document.getElementById('g-snap').value==='1';
+  SN.gridSize=parseFloat(document.getElementById('g-snapsize').value);
+  SN.pointSnap=parseFloat(document.getElementById('g-ptsnap').value);
+  document.getElementById('sg-v').textContent=SN.grid?'ON':'OFF';
+  document.getElementById('gs-v').textContent=SN.gridSize+'m';
+  document.getElementById('ps-v').textContent=SN.pointSnap+'m';
+}
+
+function applySegment() {
+  if (!selectedSeg) return;
+  selectedSeg.color=document.getElementById('s-color').value;
+  selectedSeg.width=parseFloat(document.getElementById('s-width').value);
+  selectedSeg.thickness=parseFloat(document.getElementById('s-thick').value);
+  selectedSeg.opacity=parseFloat(document.getElementById('s-opacity').value);
+  document.getElementById('sw-v').textContent=selectedSeg.width+'m';
+  document.getElementById('st-v').textContent=selectedSeg.thickness+'m';
+  document.getElementById('so-v').textContent=Math.round(selectedSeg.opacity*100)+'%';
+  selectedSeg.rebuild(); selectedSeg.setEmissive(0x2244cc);
+  rebuildAllJunctions();
+}
+
+function setSegDir(dir) {
+  if (!selectedSeg) return;
+  selectedSeg.direction = dir;
+  ['forward','backward','none'].forEach(d => {
+    document.getElementById('sd-'+d).classList.toggle('active', d===dir);
+  });
+  selectedSeg.rebuild();
+  selectedSeg.setEmissive(0x2244cc);
+}
+
+function setSegType(type) {
+  if (!selectedSeg) return;
+  selectedSeg.type=type;
+  document.getElementById('rt-straight').classList.toggle('active',type==='straight');
+  document.getElementById('rt-curved').classList.toggle('active',type==='curved');
+  document.getElementById('curve-actions').style.display=type==='curved'?'block':'none';
+  selectedSeg.rebuild(); selectedSeg.setEmissive(0x2244cc);
+  rebuildAllJunctions(); buildEditDotMeshes();
+}
+
+// ── TRUCK MODEL ──────────────────────────────────────────────────────────────
+let trucks = [];
+let selectedTruck = null;
+let isDraggingTruck = false;
+let truckCounter = 0;
+
+function makeTruckGroup() {
+  const group = new THREE.Group();
+  // CAT autonomous mining truck palette
+  const CAT_YELLOW  = 0xf0b000;
+  const CAT_DARK    = 0x1a1a1a;
+  const CAT_GREY    = 0x4a4a4a;
+  const CAT_LGREY   = 0x888888;
+  const CHROME      = 0xbbbbbb;
+  const GLASS       = 0x1a3050;
+  const RED_LIGHT   = 0xcc2200;
+  const SENSOR_WHT  = 0xdddddd;
+
+  const mat = c => new THREE.MeshLambertMaterial({ color: c });
+
+  // box(w=X, h=Y, d=Z, color, cx, cy, cz)
+  const box = (w,h,d,color,x,y,z) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat(color));
+    m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; group.add(m); return m;
+  };
+  // Cylinder, axis along Z by default (rotation.x = PI/2 makes it roll along X as expected for side-mounted wheels)
+  const cylZ = (rt,rb,h,segs,color,x,y,z) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,segs), mat(color));
+    m.rotation.x = Math.PI/2; // axle along Z → tyre rolls forward/backward along X ✓
+    m.position.set(x,y,z); m.castShadow=true; group.add(m); return m;
+  };
+  // Cylinder upright (Y axis)
+  const cylY = (rt,rb,h,segs,color,x,y,z) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,segs), mat(color));
+    m.position.set(x,y,z); m.castShadow=true; group.add(m); return m;
+  };
+
+  // ── Truck orientation: +X = FRONT, +Z = LEFT, +Y = UP ────────────────────
+  // Real CAT 793 autonomous: ~13m long, ~6.5m wide, ~6m tall
+  // Model scale: ~1 unit ≈ 1m, total ~9m long
+
+  // ── Main chassis frame ────────────────────────────────────────────────────
+  box(8.5, 0.55, 4.8, CAT_DARK,  -0.25, 1.1, 0);   // main spine
+  box(8.0, 0.3,  4.6, CAT_GREY,  -0.25, 0.82, 0);  // underframe
+
+  // ── Front nose / autonomous sensor module ─────────────────────────────────
+  // Large flat nose — autonomous trucks have no traditional cab
+  box(1.8, 2.5, 4.6, CAT_YELLOW,  3.6, 2.3, 0);   // nose block
+  box(0.15,2.2, 4.2, CAT_DARK,    4.48,2.2, 0);   // front face panel
+  // Sensor bar across front top
+  box(0.22, 0.35, 4.6, SENSOR_WHT, 4.35, 3.5, 0); // lidar bar
+  // Radar/sensor pods
+  box(0.35, 0.35, 0.35, SENSOR_WHT, 4.4, 3.7,  1.8);
+  box(0.35, 0.35, 0.35, SENSOR_WHT, 4.4, 3.7, -1.8);
+  // Front lights strip
+  box(0.1, 0.2, 3.8, 0xffffaa,    4.5, 1.6, 0);   // headlight bar
+  // Red tail-like trim stripe
+  box(0.1, 0.12, 4.4, RED_LIGHT,  4.5, 1.9, 0);
+  // Front axle cover
+  box(1.0, 0.5, 5.2, CAT_DARK,   3.2, 1.0, 0);
+
+  // ── Cab / operator module (low-profile, rear of hood) ─────────────────────
+  // Autonomous trucks have a minimal operator station or none at all
+  box(2.0, 1.6, 4.0, CAT_YELLOW,  1.8, 3.3, 0);   // cab body
+  box(0.1, 1.1, 3.4, GLASS,       2.75,3.7, 0);   // front windshield
+  box(1.8, 0.9, 0.1, GLASS,       1.8, 3.7,  2.0); // side glass L
+  box(1.8, 0.9, 0.1, GLASS,       1.8, 3.7, -2.0); // side glass R
+  box(2.2, 0.22, 4.2, CAT_DARK,   1.8, 4.18, 0);  // cab roof
+  // ROPS (rollover structure) pillars
+  box(0.18, 1.7, 0.18, CAT_DARK,  2.8, 3.5,  1.9);
+  box(0.18, 1.7, 0.18, CAT_DARK,  2.8, 3.5, -1.9);
+  box(0.18, 1.7, 0.18, CAT_DARK,  0.8, 3.5,  1.9);
+  box(0.18, 1.7, 0.18, CAT_DARK,  0.8, 3.5, -1.9);
+
+  // ── Access walkways / platforms ───────────────────────────────────────────
+  box(2.2, 0.1, 0.7, CAT_GREY,   2.2, 2.4,  2.7);  // left walkway front
+  box(2.2, 0.1, 0.7, CAT_GREY,   2.2, 2.4, -2.7);  // right walkway front
+  // Ladder rungs (left side)
+  for (let i=0; i<3; i++) box(0.06,0.06,0.65,CAT_LGREY, 3.8-i*0.4, 1.8+i*0.2, 2.75);
+
+  // ── Dump bed ──────────────────────────────────────────────────────────────
+  const bx = -2.6; // bed center X
+  box(5.4, 0.3,  4.7, CAT_YELLOW, bx,   2.55, 0);  // bed floor
+  box(5.4, 2.0,  0.22,CAT_YELLOW, bx,   3.6,  2.35);// left wall
+  box(5.4, 2.0,  0.22,CAT_YELLOW, bx,   3.6, -2.35);// right wall
+  box(0.22,2.0,  4.7, CAT_YELLOW, bx-2.7,3.6, 0);  // rear gate
+  box(0.22,1.2,  4.7, CAT_YELLOW, bx+2.7,3.1, 0);  // front wall
+  // Bed ribs (structural)
+  for (let i=-1; i<=1; i++) box(0.15,1.8,4.7,CAT_DARK, bx+i*2.0, 3.5, 0);
+  // Bed walkway rails
+  box(5.4, 0.12, 0.12, CAT_LGREY, bx, 4.64,  2.3);
+  box(5.4, 0.12, 0.12, CAT_LGREY, bx, 4.64, -2.3);
+
+  // ── Hydraulic hoist cylinders ─────────────────────────────────────────────
+  cylY(0.22,0.28, 2.4, 10, CAT_GREY, 0.8, 2.5,  1.5);
+  cylY(0.22,0.28, 2.4, 10, CAT_GREY, 0.8, 2.5, -1.5);
+  cylY(0.16,0.16, 1.2, 10, CHROME,   0.8, 3.7,  1.5); // ram extended section
+  cylY(0.16,0.16, 1.2, 10, CHROME,   0.8, 3.7, -1.5);
+
+  // ── Engine air intakes / exhausts ─────────────────────────────────────────
+  // (autonomous electric-assist — smaller exhaust, big air intake)
+  box(0.5, 0.8, 0.8, CAT_DARK,   1.2, 3.2,  2.05); // intake L
+  box(0.5, 0.8, 0.8, CAT_DARK,   1.2, 3.2, -2.05); // intake R
+  cylY(0.1,0.1, 1.0, 8, CAT_DARK, 0.8, 5.0,  1.5);  // exhaust stack L
+  cylY(0.1,0.1, 1.0, 8, CAT_DARK, 0.8, 5.0, -1.5);
+  cylY(0.14,0.11,0.15,8,CAT_DARK, 0.8, 5.55, 1.5);  // exhaust cap L
+  cylY(0.14,0.11,0.15,8,CAT_DARK, 0.8, 5.55,-1.5);
+
+  // ── Rear tail lights / safety beacons ────────────────────────────────────
+  box(0.12,0.35,0.35, RED_LIGHT, -5.0, 2.8,  2.2);
+  box(0.12,0.35,0.35, RED_LIGHT, -5.0, 2.8, -2.2);
+  cylY(0.18,0.18,0.35, 12, 0xffaa00, -5.0, 3.5, 0); // amber beacon
+
+  // ── Wheels ────────────────────────────────────────────────────────────────
+  // CAT 793 autonomous: 2 front singles + 2 rear pairs = 6 tyres
+  // Tyre axis = Z, so rotation.x = PI/2 → tyre faces left/right, rolls fwd/back ✓
+  const TR = 1.1, TW = 0.95;   // tyre radius, width
+  const RR = 0.72;              // rim radius
+
+  // wheel(centerX, outerZ, isDual)
+  const addWheel = (wx, wz, dual) => {
+    const side = wz > 0 ? 1 : -1;
+
+    // Outer tyre
+    cylZ(TR, TR, TW,  24, CAT_DARK,  wx, TR, wz);
+    // Outer rim
+    cylZ(RR, RR, TW+0.06, 20, CHROME, wx, TR, wz);
+    // Outer hub
+    cylZ(0.38,0.38,0.16, 16, CAT_YELLOW, wx, TR, wz + side*(TW/2+0.07));
+    // Hub bolts (small cylinders)
+    for (let b=0; b<8; b++) {
+      const ba = b/8*Math.PI*2;
+      cylZ(0.06,0.06,0.12,6,CAT_DARK, wx, TR+Math.cos(ba)*0.28, wz+side*(TW/2+0.13)+Math.sin(ba)*0.28);
+    }
+
+    if (dual) {
+      // Inner tyre (dual rear)
+      const iz = wz - side*(TW + 0.12);
+      cylZ(TR, TR, TW,  24, CAT_DARK,  wx, TR, iz);
+      cylZ(RR, RR, TW+0.06, 20, CHROME, wx, TR, iz);
+      cylZ(0.38,0.38,0.16, 16, CAT_YELLOW, wx, TR, iz - side*(TW/2+0.07));
+    }
+
+    // Axle stub visible between tyres
+    cylZ(0.22,0.22, dual? TW*2+0.8 : TW+0.3, 12, CAT_GREY, wx, TR, wz);
+  };
+
+  // Front axle — single tyres
+  addWheel( 3.0,  2.6, false);  // front left
+  addWheel( 3.0, -2.6, false);  // front right
+  // Rear bogies — dual tyres
+  addWheel(-1.4,  2.8, true);   // rear1 left
+  addWheel(-1.4, -2.8, true);   // rear1 right
+  addWheel(-3.6,  2.8, true);   // rear2 left
+  addWheel(-3.6, -2.8, true);   // rear2 right
+
+  // ── Front bumper / push plate ─────────────────────────────────────────────
+  box(0.35, 0.7, 4.8, CAT_DARK,   4.6, 1.1, 0);
+  // Tow hooks
+  box(0.4, 0.3, 0.3, CAT_GREY,    4.75,0.9,  1.5);
+  box(0.4, 0.3, 0.3, CAT_GREY,    4.75,0.9, -1.5);
+
+  return group;
+}
+
+class MiningTruck {
+  constructor(x, z) {
+    this.id = ++truckCounter;
+    this.x = x; this.z = z;
+    this.rotY = 0;
+    this.scale = 0.18;
+    this.yOff  = 0.4;   // sit above road
+    this.group = null;
+  }
+  rebuild() {
+    if (this.group) { scene.remove(this.group); this.group = null; }
+    this.group = makeTruckGroup();
+    this.group.position.set(this.x, this.yOff || 0.25, this.z);
+    this.group.rotation.y = this.rotY * Math.PI / 180;
+    this.group.scale.setScalar(this.scale);
+    this.group.userData.truckId = this.id;
+    this.group.traverse(m => { if (m.isMesh) { m.userData.truckId = this.id; m.renderOrder = 2; } });
+    scene.add(this.group);
+  }
+  destroy() {
+    if (this.group) { scene.remove(this.group); this.group = null; }
+  }
+}
+
+function openTruckPanel() {
+  const p = document.getElementById('truck-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function spawnTruck() {
+  // Spawn in front of camera
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+  const tx = camTarget.x + fwd.x * 15;
+  const tz = camTarget.z + fwd.z * 15;
+  const truck = new MiningTruck(tx, tz);
+  truck.rebuild();
+  trucks.push(truck);
+  document.getElementById('truck-panel').style.display = 'none';
+  // Auto-switch to edit and select it
+  setMode('edit');
+  selectTruck(truck);
+}
+
+function selectTruck(truck) {
+  if (selectedTruck && selectedTruck !== truck) deselectTruck();
+  deselect(); deselectPoly();
+  selectedTruck = truck;
+  // Highlight
+  truck.group.traverse(m => {
+    if (m.isMesh && m.material.color) {
+      m.userData._baseColor = m.userData._baseColor || m.material.color.getHex();
+      m.material = m.material.clone();
+      m.material.emissive = new THREE.Color(0x223366);
+    }
+  });
+  // Populate props panel
+  document.getElementById('tr-x').value = truck.x;
+  document.getElementById('tr-z').value = truck.z;
+  document.getElementById('tr-rot').value = truck.rotY;
+  document.getElementById('tr-scale').value = truck.scale;
+  document.getElementById('tr-x-v').textContent = truck.x.toFixed(1)+'m';
+  document.getElementById('tr-z-v').textContent = truck.z.toFixed(1)+'m';
+  document.getElementById('tr-r-v').textContent = truck.rotY+'°';
+  document.getElementById('tr-s-v').textContent = truck.scale.toFixed(2)+'×';
+  document.getElementById('truck-props-panel').style.display = 'block';
+}
+
+function deselectTruck() {
+  if (!selectedTruck) return;
+  // Remove highlight
+  selectedTruck.group.traverse(m => {
+    if (m.isMesh && m.userData._baseColor !== undefined) {
+      m.material.emissive = new THREE.Color(0x000000);
+    }
+  });
+  selectedTruck = null;
+  document.getElementById('truck-props-panel').style.display = 'none';
+}
+
+function applyTruckTransform() {
+  if (!selectedTruck) return;
+  selectedTruck.x     = parseFloat(document.getElementById('tr-x').value);
+  selectedTruck.z     = parseFloat(document.getElementById('tr-z').value);
+  selectedTruck.rotY  = parseFloat(document.getElementById('tr-rot').value);
+  selectedTruck.scale = parseFloat(document.getElementById('tr-scale').value);
+  document.getElementById('tr-x-v').textContent = selectedTruck.x.toFixed(1)+'m';
+  document.getElementById('tr-z-v').textContent = selectedTruck.z.toFixed(1)+'m';
+  document.getElementById('tr-r-v').textContent = selectedTruck.rotY+'°';
+  document.getElementById('tr-s-v').textContent = selectedTruck.scale.toFixed(2)+'×';
+  selectedTruck.group.position.set(selectedTruck.x, 0, selectedTruck.z);
+  selectedTruck.group.rotation.y = selectedTruck.rotY * Math.PI / 180;
+  selectedTruck.group.scale.setScalar(selectedTruck.scale);
+}
+
+function deleteSelectedTruck() {
+  if (!selectedTruck) return;
+  selectedTruck.destroy();
+  trucks = trucks.filter(t => t !== selectedTruck);
+  selectedTruck = null;
+  document.getElementById('truck-props-panel').style.display = 'none';
+}
+
+// Truck drag state
+let isDraggingTruckFlag = false;
+let truckDragTarget = null;
+let isDraggingPoly = false;
+let polyDragOffset = {x:0,z:0};
+let isDraggingRibbon = false;
+let ribbonDragOffset = {x:0,z:0};
+let isDraggingSeg = false;
+let segDragOffset = {x:0,z:0};
+let segDragStartPts = null; // snapshot of {start,end} before drag
+
+let clipboard = null; // { type, data }
+let isDraggingPolyVert = false;
+let isDraggingRibbonPt = false;
+let dragPolyVert = null;  // { poly, vi }
+let dragRibbonPt = null;  // { ribbon, vi }
+
+
+
+// ── TEXT OBJECTS ──────────────────────────────────────────────────────────────
+let textObjects = [];
+let selectedText = null;
+let textCounter = 0;
+let isDraggingText = false;
+let textDragOffset = {x:0,z:0};
+
+function makeTextCanvas(text, color, bold, sizePx) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const fontStr = (bold?'bold ':'') + sizePx + 'px Arial';
+  ctx.font = fontStr;
+  const w = Math.max(4, Math.ceil(ctx.measureText(text).width)) + 16;
+  const h = sizePx + 16;
+  canvas.width = w; canvas.height = h;
+  ctx.clearRect(0,0,w,h);
+  ctx.font = fontStr;
+  ctx.fillStyle = color;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 8, h/2);
+  return { canvas, w, h };
+}
+
+class TextObject {
+  constructor(x, z) {
+    this.id      = ++textCounter;
+    this.text    = 'Label';
+    this.color   = '#ffffff';
+    this.size    = 2;
+    this.bold    = true;
+    this.facing  = 'camera';  // 'camera' | 'flat' | 'rotation'
+    this.rotation= 0;
+    this.x = x; this.z = z;
+    this.mesh = null;
+  }
+
+  rebuild() {
+    if (this.mesh) { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.map && this.mesh.material.map.dispose(); this.mesh.material.dispose(); this.mesh = null; }
+
+    const sizePx = Math.max(16, Math.round(this.size * 64));
+    const { canvas, w, h } = makeTextCanvas(this.text, this.color, this.bold, sizePx);
+    const tex = new THREE.CanvasTexture(canvas);
+
+    // World width/height based on size (1 unit = 1m)
+    const aspect = w / h;
+    const worldH = this.size;
+    const worldW = worldH * aspect;
+
+    const geo = new THREE.PlaneGeometry(worldW, worldH);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.renderOrder = 10; // always on top of everything
+    this.mesh.userData.textId = this.id;
+    this.mesh.userData.isText = true;
+
+    this._applyTransform();
+    scene.add(this.mesh);
+  }
+
+  _applyTransform() {
+    if (!this.mesh) return;
+    const Y = 0.5 + this.size / 2;
+    this.mesh.position.set(this.x, Y, this.z);
+    if (this.facing === 'flat') {
+      this.mesh.rotation.set(-Math.PI/2, 0, -this.rotation * Math.PI/180);
+    } else if (this.facing === 'rotation') {
+      this.mesh.rotation.set(0, this.rotation * Math.PI/180, 0);
+    } else {
+      // camera-facing: updated each frame in animate()
+      this.mesh.rotation.set(0, 0, 0);
+    }
+  }
+
+  updateCameraFacing(cam) {
+    if (!this.mesh || this.facing !== 'camera') return;
+    this.mesh.lookAt(cam.position);
+  }
+
+  destroy() {
+    if (this.mesh) { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.map && this.mesh.material.map.dispose(); this.mesh.material.dispose(); this.mesh = null; }
+  }
+}
+
+function addTextObject() {
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd); fwd.y=0; fwd.normalize();
+  const t = new TextObject(camTarget.x + fwd.x*8, camTarget.z + fwd.z*8);
+  t.rebuild();
+  textObjects.push(t);
+  setMode('edit');
+  deselectAll();
+  selectText(t);
+}
+
+function selectText(t) {
+  if (selectedText && selectedText!==t) deselectText();
+  selectedText = t;
+  deselect(); deselectPoly(); deselectRibbon(); deselectTruck();
+  document.getElementById('no-sel').style.display = 'none';
+  document.getElementById('text-props').style.display = 'block';
+  document.getElementById('text-label').textContent = 'TEXT #'+t.id;
+  document.getElementById('st-text').value    = t.text;
+  document.getElementById('st-color').value   = t.color;
+  document.getElementById('st-size').value    = t.size;
+  document.getElementById('stsize-v').textContent = t.size+'m';
+  document.getElementById('stb-on').classList.toggle('active',  t.bold);
+  document.getElementById('stb-off').classList.toggle('active', !t.bold);
+  document.getElementById('stf-cam').classList.toggle('active',  t.facing==='camera');
+  document.getElementById('stf-flat').classList.toggle('active', t.facing==='flat');
+  document.getElementById('stf-rot').classList.toggle('active',  t.facing==='rotation');
+  document.getElementById('st-rot-field').style.display = t.facing==='rotation'?'block':'none';
+  document.getElementById('st-rot').value  = t.rotation;
+  document.getElementById('str-v').textContent = t.rotation+'°';
+  document.getElementById('st-x').value = t.x;
+  document.getElementById('stx-v').textContent = t.x.toFixed(1)+'m';
+  document.getElementById('st-z').value = t.z;
+  document.getElementById('stz-v').textContent = t.z.toFixed(1)+'m';
+}
+
+function deselectText() {
+  selectedText = null;
+  document.getElementById('text-props').style.display = 'none';
+  document.getElementById('no-sel').style.display = 'block';
+}
+
+function applyTextObject() {
+  if (!selectedText) return;
+  selectedText.text     = document.getElementById('st-text').value;
+  selectedText.color    = document.getElementById('st-color').value;
+  selectedText.size     = parseFloat(document.getElementById('st-size').value);
+  selectedText.rotation = parseFloat(document.getElementById('st-rot').value);
+  selectedText.x        = parseFloat(document.getElementById('st-x').value);
+  selectedText.z        = parseFloat(document.getElementById('st-z').value);
+  document.getElementById('stsize-v').textContent = selectedText.size+'m';
+  document.getElementById('str-v').textContent    = selectedText.rotation+'°';
+  document.getElementById('stx-v').textContent    = selectedText.x.toFixed(1)+'m';
+  document.getElementById('stz-v').textContent    = selectedText.z.toFixed(1)+'m';
+  document.getElementById('st-rot-field').style.display = selectedText.facing==='rotation'?'block':'none';
+  selectedText.rebuild();
+}
+
+function setTextBold(v) {
+  if (!selectedText) return;
+  selectedText.bold = v;
+  document.getElementById('stb-on').classList.toggle('active', v);
+  document.getElementById('stb-off').classList.toggle('active', !v);
+  selectedText.rebuild();
+}
+
+function setTextFacing(v) {
+  if (!selectedText) return;
+  selectedText.facing = v;
+  ['cam','flat','rot'].forEach(id => document.getElementById('stf-'+id).classList.remove('active'));
+  document.getElementById('stf-'+{camera:'cam',flat:'flat',rotation:'rot'}[v]).classList.add('active');
+  document.getElementById('st-rot-field').style.display = v==='rotation'?'block':'none';
+  selectedText.rebuild();
+}
+
+function deleteSelectedText() {
+  if (!selectedText) return;
+  selectedText.destroy();
+  textObjects = textObjects.filter(t=>t!==selectedText);
+  selectedText = null;
+  document.getElementById('text-props').style.display = 'none';
+  document.getElementById('no-sel').style.display = 'block';
+}
+
+function deselectAll() {
+  deselect(); deselectPoly(); deselectRibbon(); deselectTruck(); deselectText();
+}
+
+// ── COPY / PASTE ──────────────────────────────────────────────────────────────
+function copySelected() {
+  if (selectedSeg) {
+    clipboard = { type:'road', data:{
+      sx:selectedSeg.start.x, sz:selectedSeg.start.z,
+      ex:selectedSeg.end.x,   ez:selectedSeg.end.z,
+      color:selectedSeg.color, width:selectedSeg.width,
+      thickness:selectedSeg.thickness, opacity:selectedSeg.opacity,
+      type:selectedSeg.type, direction:selectedSeg.direction,
+    }};
+    flashStatus('Copied road segment');
+  } else if (selectedPoly) {
+    clipboard = { type:'polygon', data:{
+      pts:selectedPoly.pts.map(p=>({x:p.x,z:p.z})),
+      fillColor:selectedPoly.fillColor, outlineColor:selectedPoly.outlineColor,
+      outlineWidth:selectedPoly.outlineWidth, opacity:selectedPoly.opacity,
+      filled:selectedPoly.filled, rotation:selectedPoly.rotation||0,
+    }};
+    flashStatus('Copied polygon');
+  } else if (selectedRibbon) {
+    clipboard = { type:'ribbon', data:{
+      pts:selectedRibbon.pts.map(p=>({x:p.x,z:p.z})),
+      color:selectedRibbon.color, width:selectedRibbon.width,
+      opacity:selectedRibbon.opacity, rotation:selectedRibbon.rotation||0,
+    }};
+    flashStatus('Copied ribbon');
+  }
+}
+
+function pasteSelected() {
+  if (!clipboard) return;
+  const OFF = 3; // paste offset in metres
+  if (clipboard.type === 'road') {
+    const d = clipboard.data;
+    const sp = new THREE.Vector3(d.sx+OFF, 0, d.sz+OFF);
+    const ep = new THREE.Vector3(d.ex+OFF, 0, d.ez+OFF);
+    const nsp = getOrMakePt(sp), nep = getOrMakePt(ep);
+    const seg = new RoadSeg(nsp, nep);
+    seg.color=d.color; seg.width=d.width; seg.thickness=d.thickness;
+    seg.opacity=d.opacity; seg.type=d.type; seg.direction=d.direction;
+    seg.rebuild(); segments.push(seg);
+    rebuildAllJunctions(); rebuildGlobalDots();
+    deselect(); deselectPoly(); deselectRibbon(); deselectTruck();
+    select(seg);
+    flashStatus('Pasted road segment');
+  } else if (clipboard.type === 'polygon') {
+    const d = clipboard.data;
+    const pts = d.pts.map(p=>new THREE.Vector3(p.x+OFF,0,p.z+OFF));
+    const poly = new PolygonShape(pts);
+    poly.fillColor=d.fillColor; poly.outlineColor=d.outlineColor;
+    poly.outlineWidth=d.outlineWidth; poly.opacity=d.opacity;
+    poly.filled=d.filled; poly.rotation=d.rotation;
+    poly.rebuild(); polygons.push(poly);
+    deselect(); deselectRibbon(); deselectTruck();
+    selectPoly(poly);
+    flashStatus('Pasted polygon');
+  } else if (clipboard.type === 'ribbon') {
+    const d = clipboard.data;
+    const pts = d.pts.map(p=>new THREE.Vector3(p.x+OFF,0,p.z+OFF));
+    const r = new RibbonShape(pts);
+    r.color=d.color; r.width=d.width; r.opacity=d.opacity; r.rotation=d.rotation;
+    r.rebuild(); ribbons.push(r);
+    deselect(); deselectPoly(); deselectTruck(); deselectRibbon(); deselectText();
+    selectRibbon(r);
+    flashStatus('Pasted ribbon');
+  }
+}
+
+function flashStatus(msg) {
+  const el = document.getElementById('status');
+  const prev = el.textContent;
+  el.style.color='#00ff88'; el.textContent=msg;
+  setTimeout(()=>{el.style.color=''; el.textContent=prev;},1200);
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function resize() {
+  const w=window.innerWidth, h=window.innerHeight;
+  renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+(function animate() { requestAnimationFrame(animate); textObjects.forEach(t=>t.updateCameraFacing(camera)); renderer.render(scene,camera); })();
+
+
+// ── SAVE / LOAD LAYOUTS ───────────────────────────────────────────────────────
+// In-memory layout store (localStorage is blocked in sandboxed iframes)
+const _layouts = {};
+
+function getLayouts() {
+  return _layouts;
+}
+
+function saveLayouts(layouts) {
+  // No-op: _layouts is mutated directly
+}
+
+function serializeScene() {
+  // Serialize canonical points as indexed array
+  const ptList = netPts.map(p => ({ x: p.x, z: p.z }));
+  const ptIndex = pt => ptList.findIndex((_, i) => netPts[i] === pt);
+  const segs = segments.map(s => ({
+    start: ptIndex(s.start),
+    end:   ptIndex(s.end),
+    width: s.width,
+    color: s.color,
+    thickness: s.thickness,
+    opacity: s.opacity,
+    direction: s.direction,
+    type:  s.type,
+    curveSide: s.curveSide,
+    ctrlPt: s.ctrlPt ? { x: s.ctrlPt.x, z: s.ctrlPt.z } : null,
+  }));
+  const polys = polygons.map(p => ({
+    pts: p.pts.map(v => ({ x: v.x, z: v.z })),
+    fillColor: p.fillColor, outlineColor: p.outlineColor,
+    outlineWidth: p.outlineWidth, opacity: p.opacity, filled: p.filled,
+    rotation: p.rotation||0,
+  }));
+  const ribs = ribbons.map(r => ({
+    pts: r.pts.map(v => ({ x: v.x, z: v.z })),
+    color: r.color, width: r.width, opacity: r.opacity,
+    rotation: r.rotation||0, capStyle: r.capStyle||'rounded',
+  }));
+  const texts = textObjects.map(t => ({
+    text: t.text, color: t.color, size: t.size, bold: t.bold,
+    facing: t.facing, rotation: t.rotation, x: t.x, z: t.z,
+  }));
+  return { pts: ptList, segs, polys, ribs, texts };
+}
+
+function deserializeScene(data) {
+  clearAll(true); // silent — skip confirm, called programmatically
+  if (!data || !data.pts || !data.segs) return;
+  // Rebuild canonical points
+  netPts = data.pts.map(p => new THREE.Vector3(p.x, 0, p.z));
+  // Rebuild segments
+  for (const sd of data.segs) {
+    if (sd.start < 0 || sd.end < 0 || sd.start >= netPts.length || sd.end >= netPts.length) continue;
+    const seg = new RoadSeg(netPts[sd.start], netPts[sd.end]);
+    seg.width = sd.width; seg.color = sd.color; seg.thickness = sd.thickness;
+    seg.opacity = sd.opacity !== undefined ? sd.opacity : 1.0;
+    seg.direction = sd.direction || 'forward';
+    seg.type = sd.type; seg.curveSide = sd.curveSide ?? 1;
+    seg.ctrlPt = sd.ctrlPt ? new THREE.Vector3(sd.ctrlPt.x, 0, sd.ctrlPt.z) : null;
+    seg.rebuild();
+    segments.push(seg);
+  }
+  rebuildAllJunctions();
+  rebuildGlobalDots();
+  // Rebuild polygons
+  if (data.polys) {
+    for (const pd of data.polys) {
+      const poly = new PolygonShape(pd.pts.map(p => new THREE.Vector3(p.x, 0, p.z)));
+      poly.fillColor=pd.fillColor; poly.outlineColor=pd.outlineColor;
+      poly.outlineWidth=pd.outlineWidth; poly.opacity=pd.opacity; poly.filled=pd.filled;
+      poly.rotation = pd.rotation||0;
+      poly.rebuild(); polygons.push(poly);
+    }
+  }
+  // Rebuild ribbons
+  if (data.ribs) {
+    for (const rd of data.ribs) {
+      const r = new RibbonShape(rd.pts.map(p=>new THREE.Vector3(p.x,0,p.z)));
+      r.color=rd.color; r.width=rd.width; r.opacity=rd.opacity;
+      r.rotation=rd.rotation||0; r.capStyle=rd.capStyle||'rounded';
+      r.rebuild(); ribbons.push(r);
+    }
+  }
+  // Rebuild text objects
+  if (data.texts) {
+    for (const td of data.texts) {
+      const t = new TextObject(td.x, td.z);
+      t.text=td.text; t.color=td.color; t.size=td.size; t.bold=td.bold;
+      t.facing=td.facing; t.rotation=td.rotation||0;
+      t.rebuild(); textObjects.push(t);
+    }
+  }
+}
+
+function openSaveLoad() {
+  let modal = document.getElementById('sl-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'sl-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:200;display:flex;align-items:center;justify-content:center;';
+    const inner = document.createElement('div');
+    inner.id = 'sl-inner';
+    inner.style.cssText = 'background:#0a0e18;border:1px solid rgba(80,130,255,0.22);border-radius:14px;padding:22px;width:480px;max-width:92vw;max-height:82vh;display:flex;flex-direction:column;gap:14px;';
+    inner.innerHTML = [
+      '<div style="display:flex;align-items:center;justify-content:space-between">',
+        '<span style="font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:700;letter-spacing:2px;color:#00d4ff;text-transform:uppercase">Layouts</span>',
+        '<button id="sl-close-btn" style="background:none;border:none;color:#4a6080;font-size:18px;cursor:pointer;line-height:1">&#x2715;</button>',
+      '</div>',
+      '<div style="display:flex;gap:8px">',
+        '<input id="sl-name" placeholder="Layout name\u2026" maxlength="40"',
+          'style="flex:1;padding:7px 10px;background:#060a14;color:#a8b8d0;',
+          'border:1px solid rgba(80,130,255,0.18);border-radius:6px;',
+          'font-family:JetBrains Mono,monospace;font-size:11px;outline:none;">',
+        '<button id="sl-save-btn" style="padding:7px 16px;background:rgba(0,255,136,0.12);color:#00ff88;',
+          'border:1px solid rgba(0,255,136,0.3);border-radius:6px;cursor:pointer;',
+          'font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;">SAVE</button>',
+      '</div>',
+      '<div style="display:flex;gap:8px;padding-top:4px;border-top:1px solid rgba(80,130,255,0.1)">',
+        '<button id="sl-export-btn" style="flex:1;padding:7px 10px;background:rgba(58,120,255,0.1);color:#3a78ff;border:1px solid rgba(58,120,255,0.28);border-radius:6px;cursor:pointer;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;">⬇ EXPORT FILE</button>',
+        '<label id="sl-import-label" style="flex:1;padding:7px 10px;background:rgba(0,212,255,0.07);color:#00d4ff;border:1px solid rgba(0,212,255,0.22);border-radius:6px;cursor:pointer;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-align:center;">⬆ IMPORT FILE<input type="file" id="sl-import-input" accept=".json,.roadcraft" style="display:none"></label>',
+      '</div>',
+      '<div id="sl-list" style="display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:300px;padding-right:4px;"></div>',
+      '<div id="sl-empty" style="color:#4a6080;font-family:JetBrains Mono,monospace;font-size:10px;text-align:center;display:none">No saved layouts yet.</div>',
+    ].join('');
+    modal.appendChild(inner);
+    document.body.appendChild(modal);
+    // Event listeners via JS (not inline onclick — safer in sandboxed iframes)
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+    document.getElementById('sl-close-btn').addEventListener('click', () => modal.style.display = 'none');
+    document.getElementById('sl-save-btn').addEventListener('click', doSave);
+    document.getElementById('sl-name').addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
+
+    // Export all layouts to a .roadcraft JSON file
+    document.getElementById('sl-export-btn').addEventListener('click', () => {
+      const payload = { version: 1, layouts: _layouts, scene: serializeScene() };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'roadcraft-save.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showSlMsg('Exported to roadcraft-save.json', 'ok');
+    });
+
+    // Import from a .roadcraft / .json file
+    document.getElementById('sl-import-input').addEventListener('change', e => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const payload = JSON.parse(ev.target.result);
+          if (payload.layouts) {
+            Object.assign(_layouts, payload.layouts);
+            showSlMsg('Imported ' + Object.keys(payload.layouts).length + ' layout(s)!', 'ok');
+          }
+          if (payload.scene) {
+            deserializeScene(payload.scene);
+            setMode('view');
+            modal.style.display = 'none';
+          }
+          refreshSaveList();
+        } catch(err) {
+          showSlMsg('Invalid file — could not import.', 'warn');
+        }
+        e.target.value = ''; // reset so same file can be re-imported
+      };
+      reader.readAsText(file);
+    });
+  }
+  refreshSaveList();
+  modal.style.display = 'flex';
+}
+
+function refreshSaveList() {
+  const layouts = _layouts;
+  const list = document.getElementById('sl-list');
+  const empty = document.getElementById('sl-empty');
+  if (!list) return;
+  list.innerHTML = '';
+  const keys = Object.keys(layouts).sort();
+  empty.style.display = keys.length ? 'none' : 'block';
+  keys.forEach(name => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(80,130,255,0.1);border-radius:7px;';
+
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'flex:1;font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:600;color:#a8b8d0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    const meta = layouts[name].meta || {};
+    const segCount = (layouts[name].segs || []).length;
+    lbl.innerHTML = name + '<span style="color:#4a6080;font-size:10px;font-family:JetBrains Mono,monospace;margin-left:8px">'
+      + segCount + ' seg' + (segCount !== 1 ? 's' : '')
+      + (meta.date ? ' \u00b7 ' + meta.date : '') + '</span>';
+
+    const loadBtn = document.createElement('button');
+    loadBtn.textContent = 'LOAD';
+    loadBtn.style.cssText = 'padding:5px 13px;background:rgba(58,120,255,0.15);color:#3a78ff;border:1px solid rgba(58,120,255,0.35);border-radius:5px;cursor:pointer;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;white-space:nowrap;flex-shrink:0;';
+    loadBtn.addEventListener('click', () => doLoad(name));
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '\u2715';
+    delBtn.style.cssText = 'padding:5px 10px;background:transparent;color:#ff3366;border:1px solid rgba(255,51,102,0.25);border-radius:5px;cursor:pointer;font-size:12px;flex-shrink:0;';
+    delBtn.addEventListener('click', () => doDelete(name));
+
+    row.appendChild(lbl);
+    row.appendChild(loadBtn);
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  });
+}
+
+function doSave() {
+  const nameEl = document.getElementById('sl-name');
+  const name = nameEl ? nameEl.value.trim() : '';
+  if (!name) { if (nameEl) nameEl.focus(); return; }
+  if (!segments.length && !polygons.length && !ribbons.length) {
+    showSlMsg('Nothing to save — add some roads, polygons or ribbons first.', 'warn'); return;
+  }
+  const data = serializeScene();
+  const now = new Date();
+  data.meta = { date: now.toLocaleDateString('en-AU', {day:'2-digit', month:'short', year:'2-digit'}) };
+  _layouts[name] = data;
+  if (nameEl) nameEl.value = '';
+  refreshSaveList();
+  showSlMsg('Saved \u201c' + name + '\u201d!', 'ok');
+}
+
+function doLoad(name) {
+  const data = _layouts[name];
+  if (!data) { showSlMsg('Layout not found.', 'warn'); return; }
+  // Deep copy so future saves don't corrupt the stored layout
+  deserializeScene(JSON.parse(JSON.stringify(data)));
+  const modal = document.getElementById('sl-modal');
+  if (modal) modal.style.display = 'none';
+  setMode('view');
+}
+
+function doDelete(name) {
+  delete _layouts[name];
+  refreshSaveList();
+}
+
+function showSlMsg(msg, type) {
+  const inner = document.getElementById('sl-inner');
+  if (!inner) return;
+  let el = document.getElementById('sl-msg');
+  if (!el) { el = document.createElement('div'); el.id = 'sl-msg'; inner.appendChild(el); }
+  el.textContent = msg;
+  el.style.cssText = 'font-family:JetBrains Mono,monospace;font-size:10px;padding:6px 10px;border-radius:5px;text-align:center;'
+    + (type === 'ok'
+      ? 'background:rgba(0,255,136,0.1);color:#00ff88;border:1px solid rgba(0,255,136,0.25);'
+      : 'background:rgba(255,51,102,0.1);color:#ff6688;border:1px solid rgba(255,51,102,0.25);');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+}
+
+buildSkySwatches();
+applySkyPreset(0);
+applyScene();
+setMode('build');
+</script>
+</body>
+</html>
