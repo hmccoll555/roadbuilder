@@ -1,0 +1,85 @@
+# Build Roads MTL
+
+newmtl mat_7ec850
+Kd 0.4941 0.7843 0.3137
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_e7f5df
+Kd 0.9059 0.9608 0.8745
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_c87020
+Kd 0.7843 0.4392 0.1255
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_5c2e00
+Kd 0.3608 0.1804 0.0000
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_1a1a1a
+Kd 0.1020 0.1020 0.1020
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_4a4a4a
+Kd 0.2902 0.2902 0.2902
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_f0b000
+Kd 0.9412 0.6902 0.0000
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_dddddd
+Kd 0.8667 0.8667 0.8667
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_ffffaa
+Kd 1.0000 1.0000 0.6667
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_cc2200
+Kd 0.8000 0.1333 0.0000
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_1a3050
+Kd 0.1020 0.1882 0.3137
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_888888
+Kd 0.5333 0.5333 0.5333
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_bbbbbb
+Kd 0.7333 0.7333 0.7333
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1
+
+newmtl mat_ffaa00
+Kd 1.0000 0.6667 0.0000
+Ka 0.1 0.1 0.1
+Ks 0.05 0.05 0.05
+illum 1

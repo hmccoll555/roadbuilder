@@ -1,0 +1,147 @@
+# CAT 994K Wheel Loader - Materials
+# 1 unit = 1 metre
+
+newmtl cat_yellow
+Ka 0.1 0.1 0.1
+Kd 1.0000 0.8196 0.0000
+Ks 0.2 0.2 0.2
+Ns 540
+d 1.0
+illum 2
+
+newmtl cat_yellow_dk
+Ka 0.1 0.1 0.1
+Kd 0.7843 0.6588 0.0000
+Ks 0.2 0.2 0.2
+Ns 450
+d 1.0
+illum 2
+
+newmtl black
+Ka 0.1 0.1 0.1
+Kd 0.0941 0.0941 0.0941
+Ks 0.2 0.2 0.2
+Ns 225
+d 1.0
+illum 2
+
+newmtl dark_grey
+Ka 0.1 0.1 0.1
+Kd 0.1725 0.1725 0.1725
+Ks 0.2 0.2 0.2
+Ns 270
+d 1.0
+illum 2
+
+newmtl silver
+Ka 0.1 0.1 0.1
+Kd 0.5647 0.5647 0.5647
+Ks 0.5647 0.5647 0.5647
+Ns 585
+d 1.0
+illum 3
+
+newmtl chrome
+Ka 0.1 0.1 0.1
+Kd 0.8000 0.8000 0.8000
+Ks 0.8000 0.8000 0.8000
+Ns 792
+d 1.0
+illum 3
+
+newmtl rubber
+Ka 0.1 0.1 0.1
+Kd 0.0667 0.0667 0.0667
+Ks 0.2 0.2 0.2
+Ns 45
+d 1.0
+illum 2
+
+newmtl glass
+Ka 0.1 0.1 0.1
+Kd 0.4784 0.6706 0.7216
+Ks 0.2 0.2 0.2
+Ns 855
+d 1.0
+illum 2
+
+newmtl chassis
+Ka 0.1 0.1 0.1
+Kd 0.1176 0.1176 0.1176
+Ks 0.2 0.2 0.2
+Ns 135
+d 1.0
+illum 2
+
+newmtl hydraulic
+Ka 0.1 0.1 0.1
+Kd 0.7333 0.7333 0.2667
+Ks 0.7333 0.7333 0.2667
+Ns 630
+d 1.0
+illum 3
+
+newmtl steel
+Ka 0.1 0.1 0.1
+Kd 0.4392 0.4392 0.4392
+Ks 0.4392 0.4392 0.4392
+Ns 495
+d 1.0
+illum 3
+
+newmtl light_red
+Ka 0.1 0.1 0.1
+Kd 1.0000 0.1333 0.1333
+Ks 0.2 0.2 0.2
+Ns 675
+d 1.0
+illum 2
+
+newmtl light_amber
+Ka 0.1 0.1 0.1
+Kd 1.0000 0.6667 0.0000
+Ks 0.2 0.2 0.2
+Ns 675
+d 1.0
+illum 2
+
+newmtl exhaust
+Ka 0.1 0.1 0.1
+Kd 0.3333 0.3333 0.3333
+Ks 0.3333 0.3333 0.3333
+Ns 270
+d 1.0
+illum 3
+
+newmtl linkage
+Ka 0.1 0.1 0.1
+Kd 0.7843 0.6588 0.0000
+Ks 0.2 0.2 0.2
+Ns 495
+d 1.0
+illum 2
+
+newmtl bucket_liner
+Ka 0.1 0.1 0.1
+Kd 0.1882 0.1882 0.1882
+Ks 0.2 0.2 0.2
+Ns 108
+d 1.0
+illum 2
+
+newmtl headlight
+Ka 0.1 0.1 0.1
+Kd 1.0000 1.0000 0.8667
+Ks 0.2 0.2 0.2
+Ns 855
+d 1.0
+illum 2
+
+newmtl rim_yellow
+Ka 0.1 0.1 0.1
+Kd 1.0000 0.8196 0.0000
+Ks 0.2 0.2 0.2
+Ns 522
+d 1.0
+illum 2
+

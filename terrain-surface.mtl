@@ -1,0 +1,8 @@
+# Build Roads — Terrain Surface Material
+newmtl terrain_surface
+Kd 0.4784 0.3608 0.2275
+Ka 0.4784 0.3608 0.2275
+Ks 0.05 0.05 0.05
+Ns 10
+d 1
+illum 2
